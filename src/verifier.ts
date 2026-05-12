@@ -25,6 +25,9 @@ const HOST = "127.0.0.1";
 const sessionHistory: TurnEndEvent[] = [];
 const MAX_HISTORY = 10;
 
+const recentInputs: string[] = [];
+const MAX_INPUTS = 5;
+
 const client = createConnection({ port: PORT, host: HOST });
 const rl = createInterface({ input: client });
 
@@ -103,16 +106,33 @@ async function handleTurnEnd(event: TurnEndEvent): Promise<void> {
           .join("\n")}`
       : "";
 
-  const promptText = `${persona}\n\nAnalyze the following builder turn:\n\nTurn content: ${JSON.stringify(event.message)}\nTool results: ${JSON.stringify(event.toolResults)}\n${errorContext}${historyContext}\n\nProvide concise feedback (1-3 sentences) or "LGTM".\n\n${stopTemplate}`;
+  const inputContext =
+    recentInputs.length > 0
+      ? `\n\nRecent user inputs (${recentInputs.length}):\n${recentInputs.map((text, i) => `Input ${i + 1}: ${JSON.stringify(text).slice(0, 150)}`).join("\n")}`
+      : "";
 
-  const feedback = await runVerificationPrompt(session, promptText);
+  const promptText = `${persona}\n\nAnalyze the following builder turn:\n\nTurn content: ${JSON.stringify(event.message)}\nTool results: ${JSON.stringify(event.toolResults)}\n${errorContext}${historyContext}${inputContext}\n\nProvide concise feedback (1-3 sentences) or "LGTM".\n\n${stopTemplate}`;
 
-  // Send feedback back to builder
-  const response: IpcMessage = {
-    timestamp: Date.now(),
-    data: { type: "feedback", content: feedback },
-  };
-  client.write(toJsonl(response));
+  try {
+    const feedback = await runVerificationPrompt(session, promptText);
+
+    // Send feedback back to builder
+    const response: IpcMessage = {
+      timestamp: Date.now(),
+      data: { type: "feedback", content: feedback },
+    };
+    client.write(toJsonl(response));
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const response: IpcMessage = {
+      timestamp: Date.now(),
+      data: {
+        type: "feedback",
+        content: `⚠️ **Verifier error:** Analysis could not complete (${errorMessage}). Use /verify off then /verify on to restart.`,
+      },
+    };
+    client.write(toJsonl(response));
+  }
 }
 
 function runVerificationPrompt(agentSession: AgentSession, promptText: string): Promise<string> {
@@ -152,10 +172,17 @@ function handleMessage(data: IpcPayload): void {
     }
     case "session_start": {
       sessionHistory.length = 0;
+      recentInputs.length = 0;
       break;
     }
     case "input": {
-      // No-op for now
+      const text = data.event.text?.trim();
+      if (text) {
+        recentInputs.push(text);
+        if (recentInputs.length > MAX_INPUTS) {
+          recentInputs.shift();
+        }
+      }
       break;
     }
   }

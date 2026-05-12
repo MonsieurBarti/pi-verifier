@@ -225,4 +225,250 @@ describe("verifier daemon", () => {
     expect(promptCalls[0]![0]).not.toContain("Session history");
     expect(promptCalls[1]![0]).not.toContain("Session history");
   });
+
+  it("accumulates recent inputs and includes them in analysis prompt", async () => {
+    await waitForVerifierInit();
+    const rl = mockInterfaces[0]!;
+
+    const { createAgentSession } = await import("@earendil-works/pi-coding-agent");
+    const mockedFn = vi.mocked(createAgentSession);
+    const { session } = await mockedFn.mock.results[0]!.value;
+
+    // Clear state from prior tests
+    const sessionStartMsg = JSON.stringify({
+      timestamp: Date.now(),
+      data: { type: "session_start" },
+    });
+    rl.emit("line", sessionStartMsg);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    const callsBefore = vi.mocked(session.prompt).mock.calls.length;
+
+    // Send two input events
+    const inputMsg1 = JSON.stringify({
+      timestamp: Date.now(),
+      data: { type: "input", event: { text: "build a feature" } },
+    });
+    rl.emit("line", inputMsg1);
+
+    const inputMsg2 = JSON.stringify({
+      timestamp: Date.now(),
+      data: { type: "input", event: { text: "use TypeScript" } },
+    });
+    rl.emit("line", inputMsg2);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    // Turn end should include recent inputs
+    const turnEndMsg = JSON.stringify({
+      timestamp: Date.now(),
+      data: {
+        type: "turn_end",
+        event: { message: { role: "assistant", content: "done" }, toolResults: [] },
+      },
+    });
+    rl.emit("line", turnEndMsg);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    const promptCalls = vi.mocked(session.prompt).mock.calls.slice(callsBefore);
+    expect(promptCalls.length).toBe(1);
+    expect(promptCalls[0]![0]).toContain("Recent user inputs (2)");
+    expect(promptCalls[0]![0]).toContain("build a feature");
+    expect(promptCalls[0]![0]).toContain("use TypeScript");
+  });
+
+  it("clears recent inputs on session_start", async () => {
+    await waitForVerifierInit();
+    const rl = mockInterfaces[0]!;
+
+    const { createAgentSession } = await import("@earendil-works/pi-coding-agent");
+    const mockedFn = vi.mocked(createAgentSession);
+    const { session } = await mockedFn.mock.results[0]!.value;
+
+    // Clear state from prior tests
+    const sessionStartMsg = JSON.stringify({
+      timestamp: Date.now(),
+      data: { type: "session_start" },
+    });
+    rl.emit("line", sessionStartMsg);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    const callsBefore = vi.mocked(session.prompt).mock.calls.length;
+
+    // Send an input
+    const inputMsg = JSON.stringify({
+      timestamp: Date.now(),
+      data: { type: "input", event: { text: "some command" } },
+    });
+    rl.emit("line", inputMsg);
+
+    // Session start clears inputs
+    const sessionStartMsg2 = JSON.stringify({
+      timestamp: Date.now(),
+      data: { type: "session_start" },
+    });
+    rl.emit("line", sessionStartMsg2);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    // Turn end should have no recent inputs
+    const turnEndMsg = JSON.stringify({
+      timestamp: Date.now(),
+      data: {
+        type: "turn_end",
+        event: { message: { role: "assistant", content: "ok" }, toolResults: [] },
+      },
+    });
+    rl.emit("line", turnEndMsg);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    const promptCalls = vi.mocked(session.prompt).mock.calls.slice(callsBefore);
+    expect(promptCalls.length).toBe(1);
+    expect(promptCalls[0]![0]).not.toContain("Recent user inputs");
+  });
+
+  it("limits recent inputs to 5", async () => {
+    await waitForVerifierInit();
+    const rl = mockInterfaces[0]!;
+
+    const { createAgentSession } = await import("@earendil-works/pi-coding-agent");
+    const mockedFn = vi.mocked(createAgentSession);
+    const { session } = await mockedFn.mock.results[0]!.value;
+
+    // Clear state from prior tests
+    const sessionStartMsg = JSON.stringify({
+      timestamp: Date.now(),
+      data: { type: "session_start" },
+    });
+    rl.emit("line", sessionStartMsg);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    const callsBefore = vi.mocked(session.prompt).mock.calls.length;
+
+    // Send 6 inputs
+    for (let i = 1; i <= 6; i++) {
+      const inputMsg = JSON.stringify({
+        timestamp: Date.now(),
+        data: { type: "input", event: { text: `input ${i}` } },
+      });
+      rl.emit("line", inputMsg);
+    }
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    // Turn end should only have 5 most recent inputs
+    const turnEndMsg = JSON.stringify({
+      timestamp: Date.now(),
+      data: {
+        type: "turn_end",
+        event: { message: { role: "assistant", content: "done" }, toolResults: [] },
+      },
+    });
+    rl.emit("line", turnEndMsg);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    const promptCalls = vi.mocked(session.prompt).mock.calls.slice(callsBefore);
+    expect(promptCalls.length).toBe(1);
+    expect(promptCalls[0]![0]).toContain("Recent user inputs (5)");
+    expect(promptCalls[0]![0]).not.toContain("input 1");
+    expect(promptCalls[0]![0]).toContain("input 2");
+    expect(promptCalls[0]![0]).toContain("input 6");
+  });
+
+  it("ignores empty or whitespace-only input events", async () => {
+    await waitForVerifierInit();
+    const rl = mockInterfaces[0]!;
+
+    const { createAgentSession } = await import("@earendil-works/pi-coding-agent");
+    const mockedFn = vi.mocked(createAgentSession);
+    const { session } = await mockedFn.mock.results[0]!.value;
+
+    // Clear state from prior tests
+    const sessionStartMsg = JSON.stringify({
+      timestamp: Date.now(),
+      data: { type: "session_start" },
+    });
+    rl.emit("line", sessionStartMsg);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    const callsBefore = vi.mocked(session.prompt).mock.calls.length;
+
+    // Send empty and whitespace inputs
+    const emptyInput = JSON.stringify({
+      timestamp: Date.now(),
+      data: { type: "input", event: { text: "" } },
+    });
+    rl.emit("line", emptyInput);
+
+    const wsInput = JSON.stringify({
+      timestamp: Date.now(),
+      data: { type: "input", event: { text: "   " } },
+    });
+    rl.emit("line", wsInput);
+
+    // Send one valid input
+    const validInput = JSON.stringify({
+      timestamp: Date.now(),
+      data: { type: "input", event: { text: "valid" } },
+    });
+    rl.emit("line", validInput);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    const turnEndMsg = JSON.stringify({
+      timestamp: Date.now(),
+      data: {
+        type: "turn_end",
+        event: { message: { role: "assistant", content: "ok" }, toolResults: [] },
+      },
+    });
+    rl.emit("line", turnEndMsg);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    const promptCalls = vi.mocked(session.prompt).mock.calls.slice(callsBefore);
+    expect(promptCalls.length).toBe(1);
+    expect(promptCalls[0]![0]).toContain("Recent user inputs (1)");
+    expect(promptCalls[0]![0]).toContain("valid");
+    expect(promptCalls[0]![0]).not.toContain("input 0"); // no empty text
+  });
+
+  it("sends error feedback when analysis fails", async () => {
+    await waitForVerifierInit();
+    const rl = mockInterfaces[0]!;
+    const socket = mockSockets[0]!;
+
+    const { createAgentSession } = await import("@earendil-works/pi-coding-agent");
+    const mockedFn = vi.mocked(createAgentSession);
+    const { session } = await mockedFn.mock.results[0]!.value;
+
+    // Override prompt to simulate failure
+    vi.mocked(session.prompt).mockImplementationOnce(async () => {
+      await Promise.resolve();
+      const sub = (session as typeof session & { subscriberRef?: (event: unknown) => void })
+        .subscriberRef;
+      sub?.({ type: "auto_retry_end", success: false, finalError: "model timeout" });
+    });
+
+    // Clear state from prior tests
+    const sessionStartMsg = JSON.stringify({
+      timestamp: Date.now(),
+      data: { type: "session_start" },
+    });
+    rl.emit("line", sessionStartMsg);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    const turnEndMsg = JSON.stringify({
+      timestamp: Date.now(),
+      data: {
+        type: "turn_end",
+        event: { message: { role: "assistant", content: "test" }, toolResults: [] },
+      },
+    });
+    rl.emit("line", turnEndMsg);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    expect(socket.write).toHaveBeenCalled();
+    const calls = vi.mocked(socket.write).mock.calls;
+    const lastCall = fromAny<[string], unknown>(calls[calls.length - 1]);
+    const written = JSON.parse(lastCall[0]) as { data: { type: string; content: string } };
+    expect(written.data.type).toBe("feedback");
+    expect(written.data.content).toContain("Verifier error");
+    expect(written.data.content).toContain("model timeout");
+  });
 });
