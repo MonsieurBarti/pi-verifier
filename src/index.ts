@@ -13,6 +13,13 @@ export type { ExtensionAPI, ExtensionContext } from "./types.js";
 
 export interface VerifierExtensionOptions {
   port?: number;
+  portRetries?: number;
+  maxRestarts?: number;
+  restartDelayMs?: number;
+  dangerousTools?: string[];
+  feedbackCooldownMs?: number;
+  maxVerificationAttempts?: number;
+  bufferTtlMs?: number;
 }
 
 export default function verifierExtension(
@@ -24,16 +31,22 @@ export default function verifierExtension(
   const state: VerifierState = {
     mode: "off",
     port: options?.port ?? 9876,
+    portRetries: options?.portRetries ?? 5,
+    maxRestarts: options?.maxRestarts ?? 3,
+    restartDelayMs: options?.restartDelayMs ?? 1000,
+    restartCount: 0,
+    dangerousTools: new Set(options?.dangerousTools ?? ["write", "edit", "bash"]),
+    sessionHistory: [],
     server: undefined,
     clients: [],
     buffer: [],
-    bufferTtlMs: 30000,
+    bufferTtlMs: options?.bufferTtlMs ?? 30000,
     verifierProcess: undefined,
     pendingVerification: false,
     lastFeedbackInjectedAt: 0,
-    feedbackCooldownMs: 5000,
+    feedbackCooldownMs: options?.feedbackCooldownMs ?? 5000,
     verificationAttempts: 0,
-    maxVerificationAttempts: 3,
+    maxVerificationAttempts: options?.maxVerificationAttempts ?? 3,
     escalationPaused: false,
     lastContext: undefined,
   };

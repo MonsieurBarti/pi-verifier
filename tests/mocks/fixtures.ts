@@ -10,6 +10,12 @@ import type {
 export const makeMockState = (overrides?: Partial<VerifierState>): VerifierState => ({
   mode: "off",
   port: 9876,
+  portRetries: 5,
+  maxRestarts: 3,
+  restartDelayMs: 1000,
+  restartCount: 0,
+  dangerousTools: new Set(["write", "edit", "bash"]),
+  sessionHistory: [],
   server: undefined,
   clients: [],
   buffer: [],

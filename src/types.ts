@@ -37,6 +37,12 @@ export type VerifierMode = (typeof MODES)[keyof typeof MODES];
 export interface VerifierState {
   mode: VerifierMode;
   port: number;
+  portRetries: number;
+  maxRestarts: number;
+  restartDelayMs: number;
+  restartCount: number;
+  dangerousTools: Set<string>;
+  sessionHistory: TurnEndEvent[];
   server: Server | undefined;
   clients: Socket[];
   buffer: { timestamp: number; data: unknown }[];
@@ -70,7 +76,8 @@ export type IpcPayload =
   | { type: "session_start" }
   | { type: "turn_end"; event: TurnEndEvent }
   | { type: "input"; event: InputEvent }
-  | { type: "feedback"; content: string };
+  | { type: "feedback"; content: string }
+  | { type: "analysis_error"; error: string };
 
 export interface FeedbackPayload {
   type: "feedback";
