@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
-// Structural PI API — minimal subset of what @mariozechner/pi-coding-agent
-// exposes at runtime. We avoid importing the real type so this package can
-// be imported and unit-tested without the peer dep installed.
+// Structural PI API — Minimal subset of what @mariozechner/pi-coding-agent
+// Exposes at runtime. We avoid importing the real type so this package can
+// Be imported and unit-tested without the peer dep installed.
 // ---------------------------------------------------------------------------
 
 type PiEventHandler = (event: unknown, ctx: unknown) => unknown | Promise<unknown>;
@@ -13,8 +13,11 @@ interface PiRegisteredTool {
   promptSnippet: string;
   promptGuidelines: string[];
   parameters: unknown;
-  execute(toolCallId: string, input: unknown): Promise<{
-    content: Array<{ type: "text"; text: string }>;
+  execute(
+    toolCallId: string,
+    input: unknown,
+  ): Promise<{
+    content: { type: "text"; text: string }[];
     details: unknown;
   }>;
 }
@@ -44,9 +47,9 @@ export interface PiExtensionApi {
 }
 
 // ---------------------------------------------------------------------------
-// Default export — called by PI with its ExtensionAPI instance at startup.
+// Default export — Called by PI with its ExtensionAPI instance at startup.
 // This stub version logs load and does nothing else, ensuring no-op safety
-// when the extension is inactive.
+// When the extension is inactive.
 // ---------------------------------------------------------------------------
 
 export default function verifierExtension(pi: PiExtensionApi): void {
@@ -56,8 +59,12 @@ export default function verifierExtension(pi: PiExtensionApi): void {
   // Register a no-op /verify command for future milestone wiring
   pi.registerCommand("verify", {
     description: "Toggle verifier mode (stub — no-op)",
-    async handler(_args, ctx) {
-      ctx.ui?.notify?.("[pi-verifier] Verifier is not yet implemented.", "info");
+    handler(_args, ctx) {
+      const notify = ctx.ui && ctx.ui.notify;
+      if (notify) {
+        notify("[pi-verifier] Verifier is not yet implemented.", "info");
+      }
+      return Promise.resolve();
     },
   });
 }
