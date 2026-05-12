@@ -124,4 +124,105 @@ describe("verifier daemon", () => {
 
     expect(socket.write.mock.calls.length).toBe(writeCallsBefore);
   });
+
+  it("accumulates session history across turns", async () => {
+    await waitForVerifierInit();
+    const rl = mockInterfaces[0]!;
+
+    // Access the mock session to inspect prompt calls
+    const { createAgentSession } = await import("@earendil-works/pi-coding-agent");
+    const mockedFn = vi.mocked(createAgentSession);
+    const { session } = await mockedFn.mock.results[0]!.value;
+
+    // Clear any history from prior tests
+    const sessionStartMsg = JSON.stringify({
+      timestamp: Date.now(),
+      data: { type: "session_start" },
+    });
+    rl.emit("line", sessionStartMsg);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    const callsBefore = vi.mocked(session.prompt).mock.calls.length;
+
+    // First turn
+    const turnEndMsg1 = JSON.stringify({
+      timestamp: Date.now(),
+      data: {
+        type: "turn_end",
+        event: { message: { role: "assistant", content: "turn 1" }, toolResults: [] },
+      },
+    });
+    rl.emit("line", turnEndMsg1);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    // Second turn
+    const turnEndMsg2 = JSON.stringify({
+      timestamp: Date.now(),
+      data: {
+        type: "turn_end",
+        event: { message: { role: "assistant", content: "turn 2" }, toolResults: [] },
+      },
+    });
+    rl.emit("line", turnEndMsg2);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    const promptCalls = vi.mocked(session.prompt).mock.calls.slice(callsBefore);
+    expect(promptCalls.length).toBe(2);
+    expect(promptCalls[0]![0]).not.toContain("Session history");
+    expect(promptCalls[1]![0]).toContain("Session history (1 prior turn)");
+  });
+
+  it("clears session history on session_start", async () => {
+    await waitForVerifierInit();
+    const rl = mockInterfaces[0]!;
+
+    const { createAgentSession } = await import("@earendil-works/pi-coding-agent");
+    const mockedFn = vi.mocked(createAgentSession);
+    const { session } = await mockedFn.mock.results[0]!.value;
+
+    // Clear any history from prior tests
+    const sessionStartMsg = JSON.stringify({
+      timestamp: Date.now(),
+      data: { type: "session_start" },
+    });
+    rl.emit("line", sessionStartMsg);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    const callsBefore = vi.mocked(session.prompt).mock.calls.length;
+
+    // First turn to build history
+    const turnEndMsg1 = JSON.stringify({
+      timestamp: Date.now(),
+      data: {
+        type: "turn_end",
+        event: { message: { role: "assistant", content: "turn 1" }, toolResults: [] },
+      },
+    });
+    rl.emit("line", turnEndMsg1);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    // Session start clears history
+    const sessionStartMsg2 = JSON.stringify({
+      timestamp: Date.now(),
+      data: { type: "session_start" },
+    });
+    rl.emit("line", sessionStartMsg2);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    // Next turn should have no history
+    const turnEndMsg2 = JSON.stringify({
+      timestamp: Date.now(),
+      data: {
+        type: "turn_end",
+        event: { message: { role: "assistant", content: "turn 2" }, toolResults: [] },
+      },
+    });
+    rl.emit("line", turnEndMsg2);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    const promptCalls = vi.mocked(session.prompt).mock.calls.slice(callsBefore);
+    expect(promptCalls.length).toBe(2);
+    expect(promptCalls[0]![0]).not.toContain("Session history");
+    expect(promptCalls[1]![0]).not.toContain("Session history");
+  });
 });

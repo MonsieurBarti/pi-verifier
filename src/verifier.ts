@@ -22,6 +22,9 @@ import {
 const PORT = Number(process.env.PI_VERIFIER_PORT) || 9876;
 const HOST = "127.0.0.1";
 
+const sessionHistory: TurnEndEvent[] = [];
+const MAX_HISTORY = 10;
+
 const client = createConnection({ port: PORT, host: HOST });
 const rl = createInterface({ input: client });
 
@@ -75,6 +78,11 @@ try {
 async function handleTurnEnd(event: TurnEndEvent): Promise<void> {
   if (!session) return;
 
+  sessionHistory.push(event);
+  if (sessionHistory.length > MAX_HISTORY) {
+    sessionHistory.shift();
+  }
+
   const persona = loadPersona();
   const stopTemplate = loadPrompt("verify_on_stop");
 
@@ -87,7 +95,15 @@ async function handleTurnEnd(event: TurnEndEvent): Promise<void> {
       .join("\n");
   }
 
-  const promptText = `${persona}\n\nAnalyze the following builder turn:\n\nTurn content: ${JSON.stringify(event.message)}\nTool results: ${JSON.stringify(event.toolResults)}\n${errorContext}\n\nProvide concise feedback (1-3 sentences) or "LGTM".\n\n${stopTemplate}`;
+  const historyContext =
+    sessionHistory.length > 1
+      ? `\n\nSession history (${sessionHistory.length - 1} prior turn${sessionHistory.length > 2 ? "s" : ""}):\n${sessionHistory
+          .slice(0, -1)
+          .map((t, i) => `Turn ${i + 1}: ${JSON.stringify(t.message).slice(0, 150)}`)
+          .join("\n")}`
+      : "";
+
+  const promptText = `${persona}\n\nAnalyze the following builder turn:\n\nTurn content: ${JSON.stringify(event.message)}\nTool results: ${JSON.stringify(event.toolResults)}\n${errorContext}${historyContext}\n\nProvide concise feedback (1-3 sentences) or "LGTM".\n\n${stopTemplate}`;
 
   const feedback = await runVerificationPrompt(session, promptText);
 
@@ -135,7 +151,7 @@ function handleMessage(data: IpcPayload): void {
       break;
     }
     case "session_start": {
-      // Reset session context if needed
+      sessionHistory.length = 0;
       break;
     }
     case "input": {
