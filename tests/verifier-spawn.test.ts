@@ -14,11 +14,17 @@ vi.mock("node:child_process", () => ({
       if (!listeners[event]) listeners[event] = [];
       listeners[event].push(cb);
     };
+    const emit = (event: string, ...args: unknown[]): void => {
+      for (const cb of listeners[event] ?? []) {
+        cb(...args);
+      }
+    };
     const kill = vi.fn();
     const proc = {
       stdout: { on: (_event: string, _cb: (data: Buffer) => void): void => {} },
       stderr: { on: (_event: string, _cb: (data: Buffer) => void): void => {} },
       on,
+      emit,
       kill,
     };
     mockProcs.push({ listeners, kill });
@@ -62,7 +68,7 @@ describe("verifier-spawn", () => {
   });
 
   it("should update state to waiting on process exit", () => {
-    const state = makeMockState({ mode: "active" });
+    const state = makeMockState({ mode: "active", maxRestarts: 0 });
     startVerifier({ state });
     const { listeners } = mockProcs[0]!;
     const exitListeners = listeners["exit"];
@@ -82,5 +88,30 @@ describe("verifier-spawn", () => {
     exitListeners![0]!(1);
     expect(state.verifierProcess).toBeUndefined();
     expect(state.mode).toBe("off");
+  });
+
+  it("restarts verifier up to maxRestarts after crash", async () => {
+    const state = makeMockState({ mode: "active", maxRestarts: 2, restartDelayMs: 50 });
+    startVerifier({ state });
+
+    const firstProc = state.verifierProcess;
+    expect(firstProc).toBeDefined();
+
+    // Simulate crash
+    firstProc?.emit("exit", 1);
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Should have restarted
+    expect(state.restartCount).toBe(1);
+    expect(state.verifierProcess).toBeDefined();
+    expect(state.verifierProcess).not.toBe(firstProc);
+
+    // Simulate second crash
+    const secondProc = state.verifierProcess;
+    secondProc?.emit("exit", 1);
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(state.restartCount).toBe(2);
+    expect(state.mode).toBe("waiting");
   });
 });

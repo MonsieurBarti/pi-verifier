@@ -4,7 +4,7 @@ import verifierExtension from "../src/index.js";
 import { makeMockPi, makeMockCtx, makeMockCommandCtx } from "./mocks/fixtures.js";
 
 vi.mock("../src/socket-server.js", () => ({
-  startSocketServer: vi.fn(() => Promise.resolve()),
+  startSocketServerWithFallback: vi.fn(() => Promise.resolve()),
   stopSocketServer: vi.fn(),
   broadcast: vi.fn(),
 }));

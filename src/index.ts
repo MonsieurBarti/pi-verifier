@@ -1,6 +1,6 @@
 import type { ExtensionAPI, VerifierState } from "./types.js";
 import { createToggleCommand } from "./toggle-command.js";
-import { startSocketServer, stopSocketServer } from "./socket-server.js";
+import { startSocketServerWithFallback, stopSocketServer } from "./socket-server.js";
 import { createSessionCaptureHooks } from "./session-capture.js";
 import { startVerifier, stopVerifier } from "./verifier-spawn.js";
 import { createFeedbackLoop } from "./feedback-loop.js";
@@ -17,6 +17,8 @@ export interface VerifierExtensionOptions {
   maxRestarts?: number;
   restartDelayMs?: number;
   dangerousTools?: string[];
+  allowedTools?: string[];
+  toolPolicyMode?: "block" | "allow";
   feedbackCooldownMs?: number;
   maxVerificationAttempts?: number;
   bufferTtlMs?: number;
@@ -36,6 +38,8 @@ export default function verifierExtension(
     restartDelayMs: options?.restartDelayMs ?? 1000,
     restartCount: 0,
     dangerousTools: new Set(options?.dangerousTools ?? ["write", "edit", "bash"]),
+    allowedTools: new Set(options?.allowedTools ?? ["read", "grep", "find", "ls"]),
+    toolPolicyMode: options?.toolPolicyMode ?? "block",
     sessionHistory: [],
     server: undefined,
     clients: [],
@@ -58,7 +62,7 @@ export default function verifierExtension(
   const statusUI = createStatusUI();
 
   const onEnable = async (): Promise<void> => {
-    await startSocketServer({ state, onFeedback: feedbackLoop.onFeedback });
+    await startSocketServerWithFallback({ state, onFeedback: feedbackLoop.onFeedback });
     startVerifier({ state });
     pi.registerTool(verifierPromptTool);
   };

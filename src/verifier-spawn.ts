@@ -8,7 +8,12 @@ export interface VerifierSpawnDeps {
 
 export function startVerifier(deps: VerifierSpawnDeps): void {
   const { state } = deps;
-  if (state.verifierProcess) return; // Already running
+  if (state.verifierProcess) return;
+  doStartVerifier(deps);
+}
+
+function doStartVerifier(deps: VerifierSpawnDeps): void {
+  const { state } = deps;
 
   const scriptPath = join(import.meta.dirname, "verifier.js");
   const proc = spawn(process.execPath, [scriptPath], {
@@ -20,13 +25,11 @@ export function startVerifier(deps: VerifierSpawnDeps): void {
   state.verifierProcess = proc;
 
   proc.stdout?.on("data", (data) => {
-    // Pipe child stdout to parent console for observability
     // eslint-disable-next-line no-console
     console.log(`[verifier stdout] ${data.toString().trim()}`);
   });
 
   proc.stderr?.on("data", (data) => {
-    // Pipe child stderr to parent console for observability
     // eslint-disable-next-line no-console
     console.error(`[verifier stderr] ${data.toString().trim()}`);
   });
@@ -35,16 +38,37 @@ export function startVerifier(deps: VerifierSpawnDeps): void {
     // eslint-disable-next-line no-console
     console.log(`[pi-verifier] Verifier process exited with code ${code}`);
     state.verifierProcess = undefined;
-    if (state.mode !== "off") {
+
+    if (state.mode === "off") return;
+
+    if (state.restartCount >= state.maxRestarts) {
       state.mode = "waiting";
+      state.lastContext?.ui.notify(
+        `[pi-verifier] Verifier crashed ${state.maxRestarts} times. Giving up. Use /verify off then /verify on to retry.`,
+        "error",
+      );
+      return;
     }
+
+    state.restartCount++;
+    state.mode = "waiting";
+    const delay = state.restartDelayMs * Math.pow(2, state.restartCount - 1);
+    state.lastContext?.ui.notify(
+      `[pi-verifier] Verifier crashed (code ${code}). Restarting in ${delay}ms (attempt ${state.restartCount}/${state.maxRestarts})…`,
+      "warning",
+    );
+
+    setTimeout(() => {
+      if (state.mode !== "off") {
+        doStartVerifier(deps);
+      }
+    }, delay);
   });
 }
 
 export function stopVerifier(deps: VerifierSpawnDeps): void {
   const { state } = deps;
   if (!state.verifierProcess) return;
-
   state.verifierProcess.kill("SIGTERM");
   state.verifierProcess = undefined;
 }
