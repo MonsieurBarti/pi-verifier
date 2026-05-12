@@ -27,23 +27,12 @@ export async function launchVerifierTerminal(deps: LauncherDeps): Promise<Launch
 
   if (process.env.TMUX) {
     // In-tmux branch: create sibling window
-    await execFileP("tmux", [
-      "new-window",
-      "-n", tmuxSession,
-      "-c", process.cwd(),
-      command,
-    ]);
+    await execFileP("tmux", ["new-window", "-n", tmuxSession, "-c", process.cwd(), command]);
     return { tmuxSession, mode: "in-tmux" };
   }
 
   // New-OS-window branch: detached tmux session
-  await execFileP("tmux", [
-    "new-session",
-    "-d",
-    "-s", tmuxSession,
-    "-c", process.cwd(),
-    command,
-  ]);
+  await execFileP("tmux", ["new-session", "-d", "-s", tmuxSession, "-c", process.cwd(), command]);
 
   await applyVerifierTmuxOptions(tmuxSession);
   await openOsWindow(tmuxSession);
@@ -114,7 +103,16 @@ async function openOsWindow(tmuxSession: string): Promise<void> {
       return;
     }
     if (term === "WezTerm") {
-      await execFileP("wezterm", ["cli", "spawn", "--new-window", "--", "tmux", "attach", "-t", tmuxSession]);
+      await execFileP("wezterm", [
+        "cli",
+        "spawn",
+        "--new-window",
+        "--",
+        "tmux",
+        "attach",
+        "-t",
+        tmuxSession,
+      ]);
       return;
     }
     // Fallback: Terminal.app
@@ -128,7 +126,7 @@ async function openOsWindow(tmuxSession: string): Promise<void> {
   // Linux
   if (process.platform === "linux") {
     const explicit = process.env.TERMINAL;
-    if (explicit && await commandExists(explicit)) {
+    if (explicit && (await commandExists(explicit))) {
       await spawnLinuxTerminal(explicit, attachCmd);
       return;
     }

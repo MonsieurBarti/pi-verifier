@@ -68,7 +68,10 @@ export function createToggleCommand(deps: ToggleCommandDeps): ToggleCommand {
         return;
       }
 
-      ctx.ui.notify("[pi-verifier] Usage: /verify on | /verify off | /verify resume | /verify report", "info");
+      ctx.ui.notify(
+        "[pi-verifier] Usage: /verify on | /verify off | /verify resume | /verify report",
+        "info",
+      );
     },
   };
 }

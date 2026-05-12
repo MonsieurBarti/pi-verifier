@@ -16,18 +16,20 @@ export function startVerifier(deps: VerifierSpawnDeps): void {
     sessionId: state.lastContext?.sessionManager.getSessionId() ?? "unknown",
     verifierScriptPath: scriptPath,
     port: state.port,
-  }).then((result) => {
-    state.lastContext?.ui.notify(
-      `[pi-verifier] Verifier launched in ${result.mode} mode (tmux: ${result.tmuxSession}).`,
-      "info",
-    );
-  }).catch((error) => {
-    state.lastContext?.ui.notify(
-      `[pi-verifier] Failed to launch verifier terminal: ${error instanceof Error ? error.message : String(error)}`,
-      "error",
-    );
-    state.mode = "waiting";
-  });
+  })
+    .then((result) => {
+      state.lastContext?.ui.notify(
+        `[pi-verifier] Verifier launched in ${result.mode} mode (tmux: ${result.tmuxSession}).`,
+        "info",
+      );
+    })
+    .catch((error) => {
+      state.lastContext?.ui.notify(
+        `[pi-verifier] Failed to launch verifier terminal: ${error instanceof Error ? error.message : String(error)}`,
+        "error",
+      );
+      state.mode = "waiting";
+    });
 }
 
 export function stopVerifier(deps: VerifierSpawnDeps): void {

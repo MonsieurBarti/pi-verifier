@@ -5,9 +5,15 @@ import { makeMockState } from "./mocks/fixtures.js";
 let nextExecFileError: Error | undefined;
 
 vi.mock("node:child_process", () => ({
-  execFile: vi.fn((_cmd: string, _args: string[], cb: (error: Error | undefined, result: { stdout: string }) => void) => {
-    cb(nextExecFileError, { stdout: "" });
-  }),
+  execFile: vi.fn(
+    (
+      _cmd: string,
+      _args: string[],
+      cb: (error: Error | undefined, result: { stdout: string }) => void,
+    ) => {
+      cb(nextExecFileError, { stdout: "" });
+    },
+  ),
 }));
 
 vi.mock("node:path", () => ({
@@ -38,12 +44,11 @@ describe("verifier-spawn with launcher", () => {
     startVerifier({ state });
 
     // Allow microtasks to flush
-    await new Promise((r) => { setTimeout(r, 10); });
+    await new Promise((r) => {
+      setTimeout(r, 10);
+    });
 
-    expect(notifySpy).toHaveBeenCalledWith(
-      expect.stringContaining("Verifier launched in"),
-      "info",
-    );
+    expect(notifySpy).toHaveBeenCalledWith(expect.stringContaining("Verifier launched in"), "info");
   });
 
   it("kills verifier terminal on stop", async () => {
@@ -63,7 +68,9 @@ describe("verifier-spawn with launcher", () => {
 
     stopVerifier({ state });
 
-    await new Promise((r) => { setTimeout(r, 10); });
+    await new Promise((r) => {
+      setTimeout(r, 10);
+    });
 
     // Should not throw
     expect(true).toBe(true);
@@ -89,7 +96,9 @@ describe("verifier-spawn with launcher", () => {
     nextExecFileError = new Error("tmux not found");
     startVerifier({ state });
 
-    await new Promise((r) => { setTimeout(r, 10); });
+    await new Promise((r) => {
+      setTimeout(r, 10);
+    });
 
     expect(notifySpy).toHaveBeenCalledWith(
       expect.stringContaining("Failed to launch verifier terminal"),

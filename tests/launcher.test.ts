@@ -15,7 +15,11 @@ describe("launcher", () => {
       return undefined as unknown as ReturnType<typeof execFile>;
     });
 
-    const result = await launchVerifierTerminal({ sessionId: "abc", verifierScriptPath: "/dev/null", port: 9876 });
+    const result = await launchVerifierTerminal({
+      sessionId: "abc",
+      verifierScriptPath: "/dev/null",
+      port: 9876,
+    });
     expect(result.tmuxSession).toBe("pi-verifier-abc");
   });
 
@@ -23,7 +27,11 @@ describe("launcher", () => {
     const originalTmux = process.env.TMUX;
     delete process.env.TMUX;
     // ... setup mock for new-session, set-option, and openOsWindow ...
-    const result = await launchVerifierTerminal({ sessionId: "xyz", verifierScriptPath: "/dev/null", port: 9876 });
+    const result = await launchVerifierTerminal({
+      sessionId: "xyz",
+      verifierScriptPath: "/dev/null",
+      port: 9876,
+    });
     expect(result.mode).toBe("new-window");
     process.env.TMUX = originalTmux;
   });

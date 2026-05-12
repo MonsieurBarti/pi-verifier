@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { createConnection } from "node:net";
-import { startSocketServer, startSocketServerWithFallback, stopSocketServer, broadcast } from "../src/socket-server.js";
+import {
+  startSocketServer,
+  startSocketServerWithFallback,
+  stopSocketServer,
+  broadcast,
+} from "../src/socket-server.js";
 import { makeMockState } from "./mocks/fixtures.js";
 
 describe("socket-server", () => {

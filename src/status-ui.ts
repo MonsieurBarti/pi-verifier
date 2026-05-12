@@ -20,11 +20,7 @@ function formatStatus(state: VerifierState): string | undefined {
 function formatWidget(state: VerifierState): string[] | undefined {
   if (state.mode === "off") return undefined;
 
-  const statusEmoji = state.escalationPaused
-    ? "⏸️"
-    : state.pendingVerification
-      ? "⏳"
-      : "●";
+  const statusEmoji = state.escalationPaused ? "⏸️" : state.pendingVerification ? "⏳" : "●";
   const statusText = state.escalationPaused
     ? "paused"
     : state.pendingVerification
@@ -32,9 +28,7 @@ function formatWidget(state: VerifierState): string[] | undefined {
       : state.mode;
   const attempts = `${state.verificationAttempts}/${state.maxVerificationAttempts}`;
 
-  const lines = [
-    `🔍 Verifier  ${statusEmoji} ${statusText}  |  Attempts: ${attempts}`,
-  ];
+  const lines = [`🔍 Verifier  ${statusEmoji} ${statusText}  |  Attempts: ${attempts}`];
 
   if (state.escalationPaused) {
     lines.push(`   ⏸️  Escalated — run /verify resume to continue`);
