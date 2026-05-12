@@ -1,24 +1,36 @@
-import type { PiEventHandler, VerifierState } from "./types.js";
+import type {
+  ExtensionContext,
+  SessionStartEvent,
+  TurnEndEvent,
+  InputEvent,
+  VerifierState,
+} from "./types.js";
 import { broadcast } from "./socket-server.js";
 
 export interface SessionCaptureDeps {
   state: VerifierState;
 }
 
-export function createSessionCaptureHooks(deps: SessionCaptureDeps) {
+export interface SessionCaptureHooks {
+  sessionStartHandler(event: SessionStartEvent, ctx: ExtensionContext): void;
+  turnEndHandler(event: TurnEndEvent, ctx: ExtensionContext): void;
+  inputHandler(event: InputEvent, ctx: ExtensionContext): void;
+}
+
+export function createSessionCaptureHooks(deps: SessionCaptureDeps): SessionCaptureHooks {
   const { state } = deps;
 
-  const sessionStartHandler: PiEventHandler = (_event, _ctx) => {
+  const sessionStartHandler = (_event: SessionStartEvent, _ctx: ExtensionContext): void => {
     if (state.mode === "off") return;
     broadcast(deps, { type: "session_start" });
   };
 
-  const turnEndHandler: PiEventHandler = (event, _ctx) => {
+  const turnEndHandler = (event: TurnEndEvent, _ctx: ExtensionContext): void => {
     if (state.mode === "off") return;
     broadcast(deps, { type: "turn_end", event });
   };
 
-  const inputHandler: PiEventHandler = (event, _ctx) => {
+  const inputHandler = (event: InputEvent, _ctx: ExtensionContext): void => {
     if (state.mode === "off") return;
     broadcast(deps, { type: "input", event });
   };

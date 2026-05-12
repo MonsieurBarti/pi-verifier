@@ -1,24 +1,34 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createSessionCaptureHooks } from "../src/session-capture.js";
-import type { VerifierState } from "../src/types.js";
+import type {
+  ExtensionContext,
+  InputEvent,
+  SessionStartEvent,
+  TurnEndEvent,
+  VerifierState,
+} from "../src/types.js";
 
-function makeState(): VerifierState {
-  return {
-    mode: "off",
-    port: 9876,
-    server: undefined,
-    clients: [],
-    buffer: [],
-    bufferTtlMs: 30000,
-  };
-}
+const makeState = (): VerifierState => ({
+  mode: "off",
+  port: 9876,
+  server: undefined,
+  clients: [],
+  buffer: [],
+  bufferTtlMs: 30000,
+});
+
+const makeCtx = (): ExtensionContext =>
+  ({
+    ui: { notify: vi.fn(), setStatus: vi.fn() },
+    cwd: "/tmp",
+  }) as unknown as ExtensionContext;
 
 describe("session-capture", () => {
   it("should not broadcast when mode is off", () => {
     const state = makeState();
     const hooks = createSessionCaptureHooks({ state });
 
-    hooks.turnEndHandler({ some: "event" }, {});
+    hooks.turnEndHandler({ some: "event" } as unknown as TurnEndEvent, makeCtx());
     expect(state.buffer.length).toBe(0);
   });
 
@@ -27,7 +37,7 @@ describe("session-capture", () => {
     state.mode = "waiting";
     const hooks = createSessionCaptureHooks({ state });
 
-    hooks.turnEndHandler({ turn: 1 }, {});
+    hooks.turnEndHandler({ turn: 1 } as unknown as TurnEndEvent, makeCtx());
     expect(state.buffer.length).toBe(1);
     expect((state.buffer[0] as { data?: { type?: string } }).data?.type).toBe("turn_end");
   });
@@ -37,7 +47,7 @@ describe("session-capture", () => {
     state.mode = "waiting";
     const hooks = createSessionCaptureHooks({ state });
 
-    hooks.sessionStartHandler({}, {});
+    hooks.sessionStartHandler({ reason: "startup" } as unknown as SessionStartEvent, makeCtx());
     expect(state.buffer.length).toBe(1);
     expect((state.buffer[0] as { data?: { type?: string } }).data?.type).toBe("session_start");
   });
@@ -47,7 +57,7 @@ describe("session-capture", () => {
     state.mode = "waiting";
     const hooks = createSessionCaptureHooks({ state });
 
-    hooks.inputHandler({ text: "hello" }, {});
+    hooks.inputHandler({ text: "hello" } as unknown as InputEvent, makeCtx());
     expect(state.buffer.length).toBe(1);
     expect((state.buffer[0] as { data?: { type?: string } }).data?.type).toBe("input");
   });

@@ -1,12 +1,11 @@
-import type { PiExtensionApi, VerifierState } from "./types.js";
+import type { ExtensionAPI, VerifierState } from "./types.js";
 import { createToggleCommand } from "./toggle-command.js";
 import { startSocketServer, stopSocketServer } from "./socket-server.js";
 import { createSessionCaptureHooks } from "./session-capture.js";
-import { updateStatus } from "./status-ui.js";
 
-export type { PiCommandContext, PiExtensionApi } from "./types.js";
+export type { ExtensionAPI, ExtensionContext } from "./types.js";
 
-export default function verifierExtension(pi: PiExtensionApi): void {
+export default function verifierExtension(pi: ExtensionAPI): void {
   // eslint-disable-next-line no-console
   console.log("[pi-verifier] Extension loaded");
 
@@ -41,11 +40,10 @@ export default function verifierExtension(pi: PiExtensionApi): void {
   // Status update interval
   let statusInterval: ReturnType<typeof setInterval> | undefined = undefined;
   pi.on("session_start", (_event, ctx) => {
-    const setStatus = (ctx as { ui?: { setStatus?: (s: string) => void } }).ui?.setStatus;
-    if (setStatus) {
-      updateStatus(state, setStatus);
-      statusInterval = setInterval(() => updateStatus(state, setStatus), 1000);
-    }
+    ctx.ui.setStatus("verifier", formatStatus(state));
+    statusInterval = setInterval(() => {
+      ctx.ui.setStatus("verifier", formatStatus(state));
+    }, 1000);
   });
 
   pi.on("session_shutdown", () => {
@@ -58,4 +56,21 @@ export default function verifierExtension(pi: PiExtensionApi): void {
       state.mode = "off";
     }
   });
+}
+
+function formatStatus(state: VerifierState): string | undefined {
+  switch (state.mode) {
+    case "off": {
+      return undefined;
+    }
+    case "waiting": {
+      return "🔍 Verifier: waiting";
+    }
+    case "active": {
+      return "🔍 Verifier: active";
+    }
+    default: {
+      return undefined;
+    }
+  }
 }

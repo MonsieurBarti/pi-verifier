@@ -1,28 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
-import verifierExtension, { type PiExtensionApi } from "../src/index.js";
+import verifierExtension, { type ExtensionAPI } from "../src/index.js";
+
+const makeMockPi = (): ExtensionAPI =>
+  ({
+    cwd: "/tmp",
+    exec: vi.fn(),
+    on: vi.fn(),
+    registerCommand: vi.fn(),
+    registerTool: vi.fn(),
+  }) as unknown as ExtensionAPI;
 
 describe("verifierExtension", () => {
   it("should load without error", () => {
-    const mockPi: PiExtensionApi = {
-      cwd: "/tmp",
-      exec: vi.fn(),
-      on: vi.fn(),
-      registerCommand: vi.fn(),
-      registerTool: vi.fn(),
-    };
-
-    expect(() => verifierExtension(mockPi)).not.toThrow();
+    expect(() => verifierExtension(makeMockPi())).not.toThrow();
   });
 
   it("should register the /verify command", () => {
-    const mockPi: PiExtensionApi = {
-      cwd: "/tmp",
-      exec: vi.fn(),
-      on: vi.fn(),
-      registerCommand: vi.fn(),
-      registerTool: vi.fn(),
-    };
-
+    const mockPi = makeMockPi();
     verifierExtension(mockPi);
 
     expect(mockPi.registerCommand).toHaveBeenCalledWith(
@@ -34,14 +28,7 @@ describe("verifierExtension", () => {
   });
 
   it("should register session hooks", () => {
-    const mockPi: PiExtensionApi = {
-      cwd: "/tmp",
-      exec: vi.fn(),
-      on: vi.fn(),
-      registerCommand: vi.fn(),
-      registerTool: vi.fn(),
-    };
-
+    const mockPi = makeMockPi();
     verifierExtension(mockPi);
 
     expect(mockPi.on).toHaveBeenCalledWith("session_start", expect.any(Function));
