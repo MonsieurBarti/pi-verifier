@@ -84,12 +84,14 @@ export async function startSocketServerWithFallback(deps: SocketServerDeps): Pro
 
   while (retries >= 0) {
     try {
+      // oxlint-disable-next-line no-await-in-loop
       await startSocketServer(deps, port);
       return;
-    } catch (err) {
+    } catch (error) {
       if (retries === 0) {
         throw new Error(
-          `Could not bind to any port in range ${state.port}-${port}. Last error: ${err instanceof Error ? err.message : String(err)}`,
+          `Could not bind to any port in range ${state.port}-${port}. Last error: ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error },
         );
       }
       port++;

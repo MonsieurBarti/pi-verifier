@@ -42,6 +42,8 @@ export interface VerifierState {
   restartDelayMs: number;
   restartCount: number;
   dangerousTools: Set<string>;
+  allowedTools: Set<string>;
+  toolPolicyMode: "block" | "allow";
   sessionHistory: TurnEndEvent[];
   server: Server | undefined;
   clients: Socket[];
