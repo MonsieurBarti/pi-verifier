@@ -54,6 +54,8 @@ export interface VerifierState {
   pendingVerification: boolean;
   lastFeedbackInjectedAt: number;
   feedbackCooldownMs: number;
+  /** Number of turn_end events to skip because they were caused by our own feedback injection. */
+  skipTurnEndCount: number;
   verificationAttempts: number;
   maxVerificationAttempts: number;
   escalationPaused: boolean;

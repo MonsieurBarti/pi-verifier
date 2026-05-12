@@ -27,6 +27,7 @@ export const makeMockState = (overrides?: Partial<VerifierState>): VerifierState
   pendingVerification: false,
   lastFeedbackInjectedAt: 0,
   feedbackCooldownMs: 5000,
+  skipTurnEndCount: 0,
   verificationAttempts: 0,
   maxVerificationAttempts: 3,
   escalationPaused: false,

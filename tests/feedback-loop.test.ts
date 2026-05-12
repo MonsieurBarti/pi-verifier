@@ -25,27 +25,31 @@ describe("feedback-loop", () => {
     expect(state.pendingVerification).toBe(true);
   });
 
-  it("turnEndHandler skips during cooldown period", () => {
-    const now = Date.now();
+  it("turnEndHandler skips turns caused by our own feedback injection", () => {
     const state = makeMockState({
       mode: "active",
-      lastFeedbackInjectedAt: now,
-      feedbackCooldownMs: 10000,
+      skipTurnEndCount: 2,
     });
     const pi = makeMockPi();
     const escalation = makeMockEscalation();
     const loop = createFeedbackLoop({ state, pi, escalation });
 
+    // First turn_end: skipped, counter decremented to 1
     loop.turnEndHandler(fromAny<TurnEndEvent, unknown>({}));
     expect(state.pendingVerification).toBe(false);
+    expect(state.skipTurnEndCount).toBe(1);
+
+    // Second turn_end: skipped, counter decremented to 0
+    loop.turnEndHandler(fromAny<TurnEndEvent, unknown>({}));
+    expect(state.pendingVerification).toBe(false);
+    expect(state.skipTurnEndCount).toBe(0);
   });
 
   it("turnEndHandler sets pendingVerification when conditions are met", () => {
     const state = makeMockState({
       mode: "active",
       pendingVerification: false,
-      lastFeedbackInjectedAt: 0,
-      feedbackCooldownMs: 5000,
+      skipTurnEndCount: 0,
     });
     const pi = makeMockPi();
     const escalation = makeMockEscalation();
@@ -64,7 +68,7 @@ describe("feedback-loop", () => {
     loop.onFeedback({ type: "feedback", content: "There is a bug here." });
 
     expect(state.pendingVerification).toBe(false);
-    expect(state.lastFeedbackInjectedAt).toBeGreaterThan(0);
+    expect(state.skipTurnEndCount).toBe(1);
     expect(pi.sendUserMessage).toHaveBeenCalledTimes(1);
     expect(pi.sendUserMessage).toHaveBeenCalledWith(
       "🔍 **Verifier feedback:**\nThere is a bug here.",
@@ -122,16 +126,16 @@ describe("feedback-loop", () => {
     expect(state.pendingVerification).toBe(false);
   });
 
-  it("onFeedback sets lastFeedbackInjectedAt only for actionable content", () => {
+  it("onFeedback increments skipTurnEndCount only for actionable content", () => {
     const state = makeMockState();
     const pi = makeMockPi();
     const escalation = makeMockEscalation();
     const loop = createFeedbackLoop({ state, pi, escalation });
 
     loop.onFeedback({ type: "feedback", content: "LGTM" });
-    expect(state.lastFeedbackInjectedAt).toBe(0);
+    expect(state.skipTurnEndCount).toBe(0);
 
     loop.onFeedback({ type: "feedback", content: "Fix this." });
-    expect(state.lastFeedbackInjectedAt).toBeGreaterThan(0);
+    expect(state.skipTurnEndCount).toBe(1);
   });
 });

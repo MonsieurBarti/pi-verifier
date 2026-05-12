@@ -52,6 +52,7 @@ export default function verifierExtension(
     pendingVerification: false,
     lastFeedbackInjectedAt: 0,
     feedbackCooldownMs: options?.feedbackCooldownMs ?? 5000,
+    skipTurnEndCount: 0,
     verificationAttempts: 0,
     maxVerificationAttempts: options?.maxVerificationAttempts ?? 3,
     escalationPaused: false,

@@ -29,7 +29,9 @@ export function createFeedbackLoop(deps: FeedbackLoopDeps): FeedbackLoop {
     const ctx = state.lastContext;
     if (ctx && escalation.checkEscalation(ctx)) return;
 
-    state.lastFeedbackInjectedAt = Date.now();
+    // Mark that the next turn_end should be skipped — it will be caused by
+    // our own sendUserMessage injection. This prevents feedback loops.
+    state.skipTurnEndCount++;
     if (ctx) escalation.incrementAttempts(ctx);
     pi.sendUserMessage(`🔍 **Verifier feedback:**\n${payload.content}`, {
       deliverAs: "followUp",
@@ -39,13 +41,16 @@ export function createFeedbackLoop(deps: FeedbackLoopDeps): FeedbackLoop {
 
   const turnEndHandler = (_event: TurnEndEvent): void => {
     if (state.mode !== "active") return;
-    reportTracker?.recordTurn();
 
-    // Cooldown: skip turns that are follow-ups from our own injected feedback
-    const now = Date.now();
-    if (now - state.lastFeedbackInjectedAt < state.feedbackCooldownMs) {
+    // Skip turn_ends that were caused by our own feedback injection.
+    // This is the primary loop-breaker. The counter handles multiple
+    // rapid feedback injections more reliably than a time-based cooldown.
+    if (state.skipTurnEndCount > 0) {
+      state.skipTurnEndCount--;
       return;
     }
+
+    reportTracker?.recordTurn();
 
     // Only one verification at a time
     if (state.pendingVerification) {
