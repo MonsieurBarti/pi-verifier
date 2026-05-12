@@ -32,6 +32,7 @@ const client = createConnection({ port: PORT, host: HOST });
 const rl = createInterface({ input: client });
 
 let session: AgentSession | undefined;
+let isAnalyzing = false;
 
 rl.on("line", (line) => {
   try {
@@ -79,6 +80,17 @@ try {
 }
 
 async function handleTurnEnd(event: TurnEndEvent): Promise<void> {
+  if (!session || isAnalyzing) return;
+
+  isAnalyzing = true;
+  try {
+    await doHandleTurnEnd(event);
+  } finally {
+    isAnalyzing = false;
+  }
+}
+
+async function doHandleTurnEnd(event: TurnEndEvent): Promise<void> {
   if (!session) return;
 
   sessionHistory.push(event);
