@@ -14,3 +14,17 @@ pre-commit:
       run: pnpm run typecheck
     test:
       run: pnpm test
+
+pre-push:
+  parallel: true
+  commands:
+    build:
+      run: pnpm run build
+    lint:
+      run: pnpm run lint
+    format:check:
+      run: pnpm run format:check
+    typecheck:
+      run: pnpm run typecheck
+    test:
+      run: pnpm test
