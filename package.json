@@ -1,0 +1,80 @@
+{
+  "name": "@the-forge-flow/pi-verifier",
+  "version": "0.0.1",
+  "description": "PI extension that runs a verifier subagent to observe and correct builder sessions",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "oxlint . --config oxlint.json",
+    "lint:fix": "oxlint . --config oxlint.json --fix",
+    "format:check": "oxfmt --check .",
+    "format": "oxfmt .",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "extension",
+    "verifier",
+    "tff",
+    "the-forge-flow"
+  ],
+  "author": "The Forge Flow",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MonsieurBarti/pi-verifier.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MonsieurBarti/pi-verifier/issues"
+  },
+  "homepage": "https://github.com/MonsieurBarti/pi-verifier#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "pi": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-tui": "*",
+    "@sinclair/typebox": "*"
+  },
+  "devDependencies": {
+    "@mariozechner/pi-coding-agent": "latest",
+    "@mariozechner/pi-ai": "latest",
+    "@mariozechner/pi-tui": "latest",
+    "@sinclair/typebox": "^0.34.0",
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^2.1.0",
+    "oxlint": "latest",
+    "oxfmt": "latest",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}
