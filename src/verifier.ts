@@ -1,6 +1,7 @@
 import { createConnection } from "node:net";
 import { createInterface } from "node:readline";
 import { createAgentSession, type AgentSession } from "@earendil-works/pi-coding-agent";
+import { loadPersona, loadPrompt } from "./prompt-loader.js";
 import type { IpcMessage, IpcPayload, TurnEndEvent } from "./types.js";
 
 const PORT = 9876;
@@ -49,8 +50,19 @@ try {
 async function handleTurnEnd(event: TurnEndEvent): Promise<void> {
   if (!session) return;
 
-  // Construct a simple analysis prompt from the turn event
-  const promptText = `Analyze the following builder turn for correctness, safety, and best practices. Provide concise feedback (1-3 sentences) if issues are found, or say "LGTM" if everything looks good.\n\nTurn content: ${JSON.stringify(event.message)}\nTool results: ${JSON.stringify(event.toolResults)}`;
+  const persona = loadPersona();
+  const stopTemplate = loadPrompt("verify_on_stop");
+
+  const hasErrors = event.toolResults.some((tr) => tr.isError);
+  let errorContext = "";
+  if (hasErrors) {
+    errorContext = event.toolResults
+      .filter((tr) => tr.isError)
+      .map((tr) => loadPrompt("builder_error", { error: JSON.stringify(tr) }))
+      .join("\n");
+  }
+
+  const promptText = `${persona}\n\nAnalyze the following builder turn:\n\nTurn content: ${JSON.stringify(event.message)}\nTool results: ${JSON.stringify(event.toolResults)}\n${errorContext}\n\nProvide concise feedback (1-3 sentences) or "LGTM".\n\n${stopTemplate}`;
 
   const feedback = await runVerificationPrompt(session, promptText);
 

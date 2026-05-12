@@ -13,6 +13,10 @@ const makeMockState = (): VerifierState => ({
   pendingVerification: false,
   lastFeedbackInjectedAt: 0,
   feedbackCooldownMs: 5000,
+  verificationAttempts: 0,
+  maxVerificationAttempts: 3,
+  escalationPaused: false,
+  lastContext: undefined,
 });
 
 const makeMockPi = (): ExtensionAPI =>
@@ -99,5 +103,51 @@ describe("toggle-command", () => {
     await cmd.handler("invalid", ctx);
 
     expect(notify).toHaveBeenCalledWith(expect.stringContaining("Usage"), "info");
+  });
+
+  it("should resume when paused", async () => {
+    const state = makeMockState();
+    state.escalationPaused = true;
+    const onResume = vi.fn();
+    const notify = vi.fn();
+    const ctx = {
+      ...makeMockCtx(),
+      ui: { ...makeMockCtx().ui, notify },
+    } as unknown as ExtensionCommandContext;
+    const cmd = createToggleCommand({
+      state,
+      pi: makeMockPi(),
+      onEnable: vi.fn(),
+      onDisable: vi.fn(),
+      onResume,
+    });
+
+    await cmd.handler("resume", ctx);
+
+    expect(onResume).toHaveBeenCalledOnce();
+    expect(notify).toHaveBeenCalledWith(expect.stringContaining("resumed"), "info");
+  });
+
+  it("should notify when resume called but not paused", async () => {
+    const state = makeMockState();
+    state.escalationPaused = false;
+    const onResume = vi.fn();
+    const notify = vi.fn();
+    const ctx = {
+      ...makeMockCtx(),
+      ui: { ...makeMockCtx().ui, notify },
+    } as unknown as ExtensionCommandContext;
+    const cmd = createToggleCommand({
+      state,
+      pi: makeMockPi(),
+      onEnable: vi.fn(),
+      onDisable: vi.fn(),
+      onResume,
+    });
+
+    await cmd.handler("resume", ctx);
+
+    expect(onResume).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledWith(expect.stringContaining("not paused"), "info");
   });
 });

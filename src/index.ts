@@ -4,6 +4,10 @@ import { startSocketServer, stopSocketServer } from "./socket-server.js";
 import { createSessionCaptureHooks } from "./session-capture.js";
 import { startVerifier, stopVerifier } from "./verifier-spawn.js";
 import { createFeedbackLoop } from "./feedback-loop.js";
+import { createEscalationController } from "./escalation.js";
+import { createReadOnlyPolicy } from "./read-only-policy.js";
+import { createVerifierPromptTool } from "./verifier-prompt-tool.js";
+import { createStatusUI } from "./status-ui.js";
 
 export type { ExtensionAPI, ExtensionContext } from "./types.js";
 
@@ -22,13 +26,22 @@ export default function verifierExtension(pi: ExtensionAPI): void {
     pendingVerification: false,
     lastFeedbackInjectedAt: 0,
     feedbackCooldownMs: 5000,
+    verificationAttempts: 0,
+    maxVerificationAttempts: 3,
+    escalationPaused: false,
+    lastContext: undefined,
   };
 
-  const feedbackLoop = createFeedbackLoop({ state, pi });
+  const escalation = createEscalationController({ state, pi });
+  const feedbackLoop = createFeedbackLoop({ state, pi, escalation });
+  const readOnlyPolicy = createReadOnlyPolicy({ state });
+  const verifierPromptTool = createVerifierPromptTool({ state });
+  const statusUI = createStatusUI();
 
   const onEnable = async (): Promise<void> => {
     await startSocketServer({ state, onFeedback: feedbackLoop.onFeedback });
     startVerifier({ state });
+    pi.registerTool(verifierPromptTool);
   };
 
   const onDisable = (): void => {
@@ -36,7 +49,11 @@ export default function verifierExtension(pi: ExtensionAPI): void {
     stopSocketServer({ state });
   };
 
-  const toggleCmd = createToggleCommand({ state, pi, onEnable, onDisable });
+  const onResume = (): void => {
+    escalation.resume();
+  };
+
+  const toggleCmd = createToggleCommand({ state, pi, onEnable, onDisable, onResume });
   pi.registerCommand(toggleCmd.name, {
     description: toggleCmd.description,
     handler: toggleCmd.handler,
@@ -46,13 +63,29 @@ export default function verifierExtension(pi: ExtensionAPI): void {
   pi.on("session_start", hooks.sessionStartHandler);
   pi.on("turn_end", hooks.turnEndHandler);
   pi.on("input", hooks.inputHandler);
+  pi.on("input", escalation.inputHandler);
+  pi.on("tool_call", readOnlyPolicy.toolCallHandler);
 
-  // Status update interval
+  // Enhanced status updates
   let statusInterval: ReturnType<typeof setInterval> | undefined = undefined;
   pi.on("session_start", (_event, ctx) => {
-    ctx.ui.setStatus("verifier", formatStatus(state));
+    ctx.ui.setStatus("verifier", statusUI.formatStatus(state));
     statusInterval = setInterval(() => {
-      ctx.ui.setStatus("verifier", formatStatus(state));
+      const ctxCurrent = state.lastContext;
+      if (!ctxCurrent) return;
+      ctxCurrent.ui.setStatus("verifier", statusUI.formatStatus(state));
+      const widget = statusUI.formatWidget(state);
+      if (widget) {
+        ctxCurrent.ui.setWidget("verifier", widget, { placement: "belowEditor" });
+      }
+      const indicator = statusUI.formatWorkingIndicator(state);
+      if (indicator) {
+        ctxCurrent.ui.setWorkingIndicator(indicator);
+      }
+      const message = statusUI.formatWorkingMessage(state);
+      if (message) {
+        ctxCurrent.ui.setWorkingMessage(message);
+      }
     }, 1000);
   });
 
@@ -66,21 +99,4 @@ export default function verifierExtension(pi: ExtensionAPI): void {
       state.mode = "off";
     }
   });
-}
-
-function formatStatus(state: VerifierState): string | undefined {
-  switch (state.mode) {
-    case "off": {
-      return undefined;
-    }
-    case "waiting": {
-      return "🔍 Verifier: waiting";
-    }
-    case "active": {
-      return "🔍 Verifier: active";
-    }
-    default: {
-      return undefined;
-    }
-  }
 }

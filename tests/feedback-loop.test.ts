@@ -13,6 +13,10 @@ const makeState = (overrides?: Partial<VerifierState>): VerifierState => ({
   pendingVerification: false,
   lastFeedbackInjectedAt: 0,
   feedbackCooldownMs: 5000,
+  verificationAttempts: 0,
+  maxVerificationAttempts: 3,
+  escalationPaused: false,
+  lastContext: undefined,
   ...overrides,
 });
 
@@ -23,11 +27,19 @@ const makePi = (): ExtensionAPI =>
     registerCommand: vi.fn(),
   }) as unknown as ExtensionAPI;
 
+const makeEscalation = () => ({
+  inputHandler: vi.fn(),
+  checkEscalation: vi.fn(() => false),
+  incrementAttempts: vi.fn(),
+  resume: vi.fn(),
+});
+
 describe("feedback-loop", () => {
   it("turnEndHandler skips when mode is off", () => {
     const state = makeState({ mode: "off" });
     const pi = makePi();
-    const loop = createFeedbackLoop({ state, pi });
+    const escalation = makeEscalation();
+    const loop = createFeedbackLoop({ state, pi, escalation });
 
     loop.turnEndHandler({} as unknown as TurnEndEvent);
     expect(state.pendingVerification).toBe(false);
@@ -36,7 +48,8 @@ describe("feedback-loop", () => {
   it("turnEndHandler skips when pendingVerification is true", () => {
     const state = makeState({ mode: "active", pendingVerification: true });
     const pi = makePi();
-    const loop = createFeedbackLoop({ state, pi });
+    const escalation = makeEscalation();
+    const loop = createFeedbackLoop({ state, pi, escalation });
 
     loop.turnEndHandler({} as unknown as TurnEndEvent);
     expect(state.pendingVerification).toBe(true);
@@ -50,7 +63,8 @@ describe("feedback-loop", () => {
       feedbackCooldownMs: 10000,
     });
     const pi = makePi();
-    const loop = createFeedbackLoop({ state, pi });
+    const escalation = makeEscalation();
+    const loop = createFeedbackLoop({ state, pi, escalation });
 
     loop.turnEndHandler({} as unknown as TurnEndEvent);
     expect(state.pendingVerification).toBe(false);
@@ -64,7 +78,8 @@ describe("feedback-loop", () => {
       feedbackCooldownMs: 5000,
     });
     const pi = makePi();
-    const loop = createFeedbackLoop({ state, pi });
+    const escalation = makeEscalation();
+    const loop = createFeedbackLoop({ state, pi, escalation });
 
     loop.turnEndHandler({} as unknown as TurnEndEvent);
     expect(state.pendingVerification).toBe(true);
@@ -73,7 +88,8 @@ describe("feedback-loop", () => {
   it("onFeedback injects message via sendUserMessage for non-empty non-LGTM content", () => {
     const state = makeState();
     const pi = makePi();
-    const loop = createFeedbackLoop({ state, pi });
+    const escalation = makeEscalation();
+    const loop = createFeedbackLoop({ state, pi, escalation });
 
     loop.onFeedback({ type: "feedback", content: "There is a bug here." });
 
@@ -89,7 +105,8 @@ describe("feedback-loop", () => {
   it("onFeedback ignores empty content", () => {
     const state = makeState();
     const pi = makePi();
-    const loop = createFeedbackLoop({ state, pi });
+    const escalation = makeEscalation();
+    const loop = createFeedbackLoop({ state, pi, escalation });
 
     loop.onFeedback({ type: "feedback", content: "" });
 
@@ -100,7 +117,8 @@ describe("feedback-loop", () => {
   it("onFeedback ignores whitespace-only content", () => {
     const state = makeState();
     const pi = makePi();
-    const loop = createFeedbackLoop({ state, pi });
+    const escalation = makeEscalation();
+    const loop = createFeedbackLoop({ state, pi, escalation });
 
     loop.onFeedback({ type: "feedback", content: "   \n  " });
 
@@ -111,7 +129,8 @@ describe("feedback-loop", () => {
   it("onFeedback ignores LGTM", () => {
     const state = makeState();
     const pi = makePi();
-    const loop = createFeedbackLoop({ state, pi });
+    const escalation = makeEscalation();
+    const loop = createFeedbackLoop({ state, pi, escalation });
 
     loop.onFeedback({ type: "feedback", content: "LGTM" });
 
@@ -122,7 +141,8 @@ describe("feedback-loop", () => {
   it("onFeedback resets pendingVerification even for ignored content", () => {
     const state = makeState({ pendingVerification: true });
     const pi = makePi();
-    const loop = createFeedbackLoop({ state, pi });
+    const escalation = makeEscalation();
+    const loop = createFeedbackLoop({ state, pi, escalation });
 
     loop.onFeedback({ type: "feedback", content: "LGTM" });
     expect(state.pendingVerification).toBe(false);
@@ -135,7 +155,8 @@ describe("feedback-loop", () => {
   it("onFeedback sets lastFeedbackInjectedAt only for actionable content", () => {
     const state = makeState();
     const pi = makePi();
-    const loop = createFeedbackLoop({ state, pi });
+    const escalation = makeEscalation();
+    const loop = createFeedbackLoop({ state, pi, escalation });
 
     loop.onFeedback({ type: "feedback", content: "LGTM" });
     expect(state.lastFeedbackInjectedAt).toBe(0);

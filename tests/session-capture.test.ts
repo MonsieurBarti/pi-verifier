@@ -19,6 +19,10 @@ const makeState = (): VerifierState => ({
   pendingVerification: false,
   lastFeedbackInjectedAt: 0,
   feedbackCooldownMs: 5000,
+  verificationAttempts: 0,
+  maxVerificationAttempts: 3,
+  escalationPaused: false,
+  lastContext: undefined,
 });
 
 const makeCtx = (): ExtensionContext =>

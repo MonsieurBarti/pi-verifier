@@ -5,6 +5,7 @@ export interface ToggleCommandDeps {
   pi: ExtensionAPI;
   onEnable: () => void | Promise<void>;
   onDisable: () => void | Promise<void>;
+  onResume?: () => void;
 }
 
 export interface ToggleCommand {
@@ -14,11 +15,11 @@ export interface ToggleCommand {
 }
 
 export function createToggleCommand(deps: ToggleCommandDeps): ToggleCommand {
-  const { state, onEnable, onDisable } = deps;
+  const { state, onEnable, onDisable, onResume } = deps;
 
   return {
     name: "verify",
-    description: "Toggle verifier mode: /verify on | /verify off",
+    description: "Toggle verifier mode: /verify on | /verify off | /verify resume",
     async handler(args: string, ctx: ExtensionCommandContext): Promise<void> {
       const arg = args.trim().toLowerCase();
 
@@ -47,7 +48,17 @@ export function createToggleCommand(deps: ToggleCommandDeps): ToggleCommand {
         return;
       }
 
-      ctx.ui.notify("[pi-verifier] Usage: /verify on | /verify off", "info");
+      if (arg === "resume") {
+        if (!state.escalationPaused) {
+          ctx.ui.notify("[pi-verifier] Verification is not paused.", "info");
+          return;
+        }
+        onResume?.();
+        ctx.ui.notify("[pi-verifier] Verification resumed.", "info");
+        return;
+      }
+
+      ctx.ui.notify("[pi-verifier] Usage: /verify on | /verify off | /verify resume", "info");
     },
   };
 }

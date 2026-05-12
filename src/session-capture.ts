@@ -21,18 +21,21 @@ export interface SessionCaptureHooks {
 export function createSessionCaptureHooks(deps: SessionCaptureDeps): SessionCaptureHooks {
   const { state } = deps;
 
-  const sessionStartHandler = (_event: SessionStartEvent, _ctx: ExtensionContext): void => {
+  const sessionStartHandler = (_event: SessionStartEvent, ctx: ExtensionContext): void => {
+    state.lastContext = ctx;
     if (state.mode === "off") return;
     broadcast(deps, { type: "session_start" });
   };
 
-  const turnEndHandler = (event: TurnEndEvent, _ctx: ExtensionContext): void => {
+  const turnEndHandler = (event: TurnEndEvent, ctx: ExtensionContext): void => {
+    state.lastContext = ctx;
     if (state.mode === "off") return;
     broadcast(deps, { type: "turn_end", event });
     deps.onTurnEnd?.(event);
   };
 
-  const inputHandler = (event: InputEvent, _ctx: ExtensionContext): void => {
+  const inputHandler = (event: InputEvent, ctx: ExtensionContext): void => {
+    state.lastContext = ctx;
     if (state.mode === "off") return;
     broadcast(deps, { type: "input", event });
   };

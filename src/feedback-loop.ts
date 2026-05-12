@@ -1,8 +1,10 @@
+import type { EscalationController } from "./escalation.js";
 import type { ExtensionAPI, TurnEndEvent, VerifierState } from "./types.js";
 
 export interface FeedbackLoopDeps {
   state: VerifierState;
   pi: ExtensionAPI;
+  escalation: EscalationController;
 }
 
 export interface FeedbackLoop {
@@ -11,7 +13,7 @@ export interface FeedbackLoop {
 }
 
 export function createFeedbackLoop(deps: FeedbackLoopDeps): FeedbackLoop {
-  const { state, pi } = deps;
+  const { state, pi, escalation } = deps;
 
   const onFeedback = (payload: { type: "feedback"; content: string }): void => {
     state.pendingVerification = false;
@@ -19,7 +21,11 @@ export function createFeedbackLoop(deps: FeedbackLoopDeps): FeedbackLoop {
     if (!payload.content || payload.content.trim() === "") return;
     if (payload.content.trim() === "LGTM") return;
 
+    const ctx = state.lastContext;
+    if (ctx && escalation.checkEscalation(ctx)) return;
+
     state.lastFeedbackInjectedAt = Date.now();
+    if (ctx) escalation.incrementAttempts(ctx);
     pi.sendUserMessage(`🔍 **Verifier feedback:**\n${payload.content}`, {
       deliverAs: "followUp",
     });

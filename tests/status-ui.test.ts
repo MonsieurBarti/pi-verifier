@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { formatStatus } from "../src/status-ui.js";
+import { describe, it, expect } from "vitest";
+import { createStatusUI } from "../src/status-ui.js";
 import type { VerifierState } from "../src/types.js";
 
-function makeState(mode: VerifierState["mode"]): VerifierState {
+function makeState(overrides: Partial<VerifierState> = {}): VerifierState {
   return {
-    mode,
+    mode: "off",
     port: 9876,
     server: undefined,
     clients: [],
@@ -14,19 +14,49 @@ function makeState(mode: VerifierState["mode"]): VerifierState {
     pendingVerification: false,
     lastFeedbackInjectedAt: 0,
     feedbackCooldownMs: 5000,
-  };
+    verificationAttempts: 0,
+    maxVerificationAttempts: 3,
+    escalationPaused: false,
+    ...overrides,
+  } as unknown as VerifierState;
 }
 
+const ui = createStatusUI();
+
 describe("status-ui", () => {
-  it("should format off state", () => {
-    expect(formatStatus(makeState("off"))).toBe("🔍 Verifier: off");
+  it("returns undefined status when off", () => {
+    expect(ui.formatStatus(makeState())).toBeUndefined();
   });
 
-  it("should format waiting state", () => {
-    expect(formatStatus(makeState("waiting"))).toBe("🔍 Verifier: waiting");
+  it("shows paused status when escalated", () => {
+    expect(ui.formatStatus(makeState({ mode: "active", escalationPaused: true }))).toContain(
+      "paused",
+    );
   });
 
-  it("should format active state", () => {
-    expect(formatStatus(makeState("active"))).toBe("🔍 Verifier: active");
+  it("shows analyzing status when pending", () => {
+    expect(ui.formatStatus(makeState({ mode: "active", pendingVerification: true }))).toContain(
+      "analyzing",
+    );
+  });
+
+  it("returns widget content when active", () => {
+    const widget = ui.formatWidget(makeState({ mode: "active", verificationAttempts: 2 }));
+    expect(widget).toBeDefined();
+    expect(widget!.join("\n")).toContain("Attempts:  2");
+  });
+
+  it("returns working indicator when analyzing", () => {
+    const indicator = ui.formatWorkingIndicator(
+      makeState({ mode: "active", pendingVerification: true }),
+    );
+    expect(indicator).toBeDefined();
+    expect(indicator!.frames).toEqual(["◐", "◓", "◑", "◒"]);
+  });
+
+  it("returns working message when analyzing", () => {
+    expect(
+      ui.formatWorkingMessage(makeState({ mode: "active", pendingVerification: true })),
+    ).toContain("analyzing");
   });
 });

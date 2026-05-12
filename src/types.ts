@@ -40,6 +40,11 @@ export interface VerifierState {
   pendingVerification: boolean;
   lastFeedbackInjectedAt: number;
   feedbackCooldownMs: number;
+  // NEW fields for M5
+  verificationAttempts: number;
+  maxVerificationAttempts: number;
+  escalationPaused: boolean;
+  lastContext: ExtensionContext | undefined;
 }
 
 export interface SessionEvent {
