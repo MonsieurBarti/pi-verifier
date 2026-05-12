@@ -3,6 +3,7 @@ import { createToggleCommand } from "./toggle-command.js";
 import { startSocketServerWithFallback, stopSocketServer } from "./socket-server.js";
 import { createSessionCaptureHooks } from "./session-capture.js";
 import { startVerifier, stopVerifier } from "./verifier-spawn.js";
+import { getTmuxAttachCommand } from "./launcher.js";
 import { createFeedbackLoop } from "./feedback-loop.js";
 import { createEscalationController } from "./escalation.js";
 import { createReadOnlyPolicy } from "./read-only-policy.js";
@@ -84,7 +85,25 @@ export default function verifierExtension(
     pi.sendUserMessage(formatted, { deliverAs: "followUp" });
   };
 
-  const toggleCmd = createToggleCommand({ state, pi, onEnable, onDisable, onResume, onReport });
+  const onLaunch = (cmdCtx: ExtensionCommandContext): void => {
+    const sessionId = cmdCtx.sessionManager?.getSessionId();
+    if (!sessionId) {
+      cmdCtx.ui.notify("[pi-verifier] No active session ID.", "warning");
+      return;
+    }
+    const attachCmd = getTmuxAttachCommand(sessionId);
+    cmdCtx.ui.notify(`[pi-verifier] Run this in your terminal: ${attachCmd}`, "info");
+  };
+
+  const toggleCmd = createToggleCommand({
+    state,
+    pi,
+    onEnable,
+    onDisable,
+    onResume,
+    onReport,
+    onLaunch,
+  });
   pi.registerCommand(toggleCmd.name, {
     description: toggleCmd.description,
     handler: toggleCmd.handler,

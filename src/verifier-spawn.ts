@@ -19,13 +19,13 @@ export function startVerifier(deps: VerifierSpawnDeps): void {
   })
     .then((result) => {
       state.lastContext?.ui.notify(
-        `[pi-verifier] Verifier launched in ${result.mode} mode (tmux: ${result.tmuxSession}).`,
+        `[pi-verifier] Verifier running in tmux session: ${result.tmuxSession}. Use /verify launch to get the attach command.`,
         "info",
       );
     })
     .catch((error) => {
       state.lastContext?.ui.notify(
-        `[pi-verifier] Failed to launch verifier terminal: ${error instanceof Error ? error.message : String(error)}`,
+        `[pi-verifier] Failed to launch verifier: ${error instanceof Error ? error.message : String(error)}`,
         "error",
       );
       state.mode = "waiting";

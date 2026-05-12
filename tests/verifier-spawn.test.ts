@@ -48,7 +48,10 @@ describe("verifier-spawn with launcher", () => {
       setTimeout(r, 10);
     });
 
-    expect(notifySpy).toHaveBeenCalledWith(expect.stringContaining("Verifier launched in"), "info");
+    expect(notifySpy).toHaveBeenCalledWith(
+      expect.stringContaining("Verifier running in tmux session"),
+      "info",
+    );
   });
 
   it("kills verifier terminal on stop", async () => {
@@ -101,7 +104,7 @@ describe("verifier-spawn with launcher", () => {
     });
 
     expect(notifySpy).toHaveBeenCalledWith(
-      expect.stringContaining("Failed to launch verifier terminal"),
+      expect.stringContaining("Failed to launch verifier"),
       "error",
     );
     expect(state.mode).toBe("waiting");
