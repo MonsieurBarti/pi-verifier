@@ -1,4 +1,4 @@
-import type { ExtensionAPI, VerifierState } from "./types.js";
+import type { ExtensionAPI, ExtensionCommandContext, VerifierState } from "./types.js";
 import { createToggleCommand } from "./toggle-command.js";
 import { startSocketServerWithFallback, stopSocketServer } from "./socket-server.js";
 import { createSessionCaptureHooks } from "./session-capture.js";
@@ -8,6 +8,7 @@ import { createEscalationController } from "./escalation.js";
 import { createReadOnlyPolicy } from "./read-only-policy.js";
 import { createVerifierPromptTool } from "./verifier-prompt-tool.js";
 import { createStatusUI } from "./status-ui.js";
+import { createSessionReportTracker, formatReport } from "./session-report.js";
 
 export type { ExtensionAPI, ExtensionContext } from "./types.js";
 
@@ -56,7 +57,8 @@ export default function verifierExtension(
   };
 
   const escalation = createEscalationController({ state, pi });
-  const feedbackLoop = createFeedbackLoop({ state, pi, escalation });
+  const reportTracker = createSessionReportTracker(state);
+  const feedbackLoop = createFeedbackLoop({ state, pi, escalation, reportTracker });
   const readOnlyPolicy = createReadOnlyPolicy({ state });
   const verifierPromptTool = createVerifierPromptTool({ state });
   const statusUI = createStatusUI();
@@ -76,7 +78,13 @@ export default function verifierExtension(
     escalation.resume();
   };
 
-  const toggleCmd = createToggleCommand({ state, pi, onEnable, onDisable, onResume });
+  const onReport = (_cmdCtx: ExtensionCommandContext): void => {
+    const report = reportTracker.generateReport();
+    const formatted = formatReport(report);
+    pi.sendUserMessage(formatted, { deliverAs: "followUp" });
+  };
+
+  const toggleCmd = createToggleCommand({ state, pi, onEnable, onDisable, onResume, onReport });
   pi.registerCommand(toggleCmd.name, {
     description: toggleCmd.description,
     handler: toggleCmd.handler,

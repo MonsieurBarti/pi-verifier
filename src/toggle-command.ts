@@ -6,6 +6,7 @@ export interface ToggleCommandDeps {
   onEnable: () => void | Promise<void>;
   onDisable: () => void | Promise<void>;
   onResume?: () => void;
+  onReport?: (ctx: ExtensionCommandContext) => void;
 }
 
 export interface ToggleCommand {
@@ -19,7 +20,7 @@ export function createToggleCommand(deps: ToggleCommandDeps): ToggleCommand {
 
   return {
     name: "verify",
-    description: "Toggle verifier mode: /verify on | /verify off | /verify resume",
+    description: "Toggle verifier mode: /verify on | /verify off | /verify resume | /verify report",
     async handler(args: string, ctx: ExtensionCommandContext): Promise<void> {
       const arg = args.trim().toLowerCase();
 
@@ -58,7 +59,16 @@ export function createToggleCommand(deps: ToggleCommandDeps): ToggleCommand {
         return;
       }
 
-      ctx.ui.notify("[pi-verifier] Usage: /verify on | /verify off | /verify resume", "info");
+      if (arg === "report") {
+        if (state.mode === "off") {
+          ctx.ui.notify("[pi-verifier] No active session to report on.", "warning");
+          return;
+        }
+        deps.onReport?.(ctx);
+        return;
+      }
+
+      ctx.ui.notify("[pi-verifier] Usage: /verify on | /verify off | /verify resume | /verify report", "info");
     },
   };
 }
