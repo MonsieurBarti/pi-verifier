@@ -1,0 +1,30 @@
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm exec commitlint --edit {1}
+
+pre-commit:
+  parallel: true
+  commands:
+    lint:
+      glob: "*.{js,ts}"
+      run: pnpm run lint
+    typecheck:
+      glob: "*.{ts}"
+      run: pnpm run typecheck
+    test:
+      run: pnpm test
+
+pre-push:
+  parallel: true
+  commands:
+    build:
+      run: pnpm run build
+    lint:
+      run: pnpm run lint
+    format:check:
+      run: pnpm run format:check
+    typecheck:
+      run: pnpm run typecheck
+    test:
+      run: pnpm test

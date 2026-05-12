@@ -14,6 +14,7 @@ export function startVerifier(deps: VerifierSpawnDeps): void {
   const proc = spawn(process.execPath, [scriptPath], {
     detached: false,
     stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, PI_VERIFIER_PORT: String(state.port) },
   });
 
   state.verifierProcess = proc;

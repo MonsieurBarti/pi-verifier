@@ -2,4 +2,5 @@ allowBuilds:
   "@google/genai": true
   esbuild: true
   koffi: true
+  lefthook: true
   protobufjs: true

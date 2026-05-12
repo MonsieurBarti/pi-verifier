@@ -30,7 +30,11 @@ describe("escalation", () => {
   });
 
   it("resumes correctly", () => {
-    const state = makeMockState({ mode: "active", escalationPaused: true, verificationAttempts: 3 });
+    const state = makeMockState({
+      mode: "active",
+      escalationPaused: true,
+      verificationAttempts: 3,
+    });
     const { resume } = createEscalationController({ state, pi: makeMockPi() });
     resume();
     expect(state.escalationPaused).toBe(false);

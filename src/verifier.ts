@@ -19,7 +19,7 @@ import {
   type TurnEndEvent,
 } from "./types.js";
 
-const PORT = 9876;
+const PORT = Number(process.env.PI_VERIFIER_PORT) || 9876;
 const HOST = "127.0.0.1";
 
 const client = createConnection({ port: PORT, host: HOST });
