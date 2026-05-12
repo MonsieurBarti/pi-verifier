@@ -11,12 +11,19 @@ import { createStatusUI } from "./status-ui.js";
 
 export type { ExtensionAPI, ExtensionContext } from "./types.js";
 
-export default function verifierExtension(pi: ExtensionAPI): void {
+export interface VerifierExtensionOptions {
+  port?: number;
+}
+
+export default function verifierExtension(
+  pi: ExtensionAPI,
+  options?: VerifierExtensionOptions,
+): void {
   // Extension loaded — state initialized below
 
   const state: VerifierState = {
     mode: "off",
-    port: 9876,
+    port: options?.port ?? 9876,
     server: undefined,
     clients: [],
     buffer: [],

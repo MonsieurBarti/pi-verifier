@@ -1,14 +1,31 @@
 import { fromAny } from "@total-typescript/shoehorn";
 import { describe, expect, it, vi } from "vitest";
-import { createConnection } from "node:net";
+import { createConnection, createServer } from "node:net";
 import verifierExtension from "../src/index.js";
 import { makeMockPi, makeMockCtx, makeMockCommandCtx } from "./mocks/fixtures.js";
 import type { TurnEndEvent, SessionStartEvent } from "../src/types.js";
 
+function getFreePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.listen(0, () => {
+      const address = server.address();
+      if (address && typeof address === "object") {
+        const { port } = address;
+        server.close(() => resolve(port));
+      } else {
+        server.close(() => reject(new Error("Could not get free port")));
+      }
+    });
+    server.on("error", reject);
+  });
+}
+
 describe("E2E: builder ↔ verifier loop", () => {
   it("full loop: enable → session_start → turn_end → mock verifier feedback → followUp injected", async () => {
+    const port = await getFreePort();
     const pi = makeMockPi();
-    verifierExtension(pi);
+    verifierExtension(pi, { port });
 
     // Extract command handler
     const cmdCall = vi.mocked(pi.registerCommand).mock.calls.find((c) => c[0] === "verify");
@@ -34,7 +51,7 @@ describe("E2E: builder ↔ verifier loop", () => {
     });
 
     // Connect mock verifier client
-    const client = createConnection({ port: 9876 });
+    const client = createConnection({ port });
     await new Promise<void>((resolve, reject) => {
       client.on("connect", resolve);
       client.on("error", reject);
