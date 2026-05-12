@@ -9,7 +9,7 @@ export type {
   TurnEndEvent,
   SessionStartEvent,
   InputEvent,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 
 // ---------------------------------------------------------------------------
 // Verifier extension-specific types
