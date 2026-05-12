@@ -1,70 +1,61 @@
-// ---------------------------------------------------------------------------
-// Structural PI API — Minimal subset of what @mariozechner/pi-coding-agent
-// Exposes at runtime. We avoid importing the real type so this package can
-// Be imported and unit-tested without the peer dep installed.
-// ---------------------------------------------------------------------------
+import type { PiExtensionApi, VerifierState } from "./types.js";
+import { createToggleCommand } from "./toggle-command.js";
+import { startSocketServer, stopSocketServer } from "./socket-server.js";
+import { createSessionCaptureHooks } from "./session-capture.js";
+import { updateStatus } from "./status-ui.js";
 
-type PiEventHandler = (event: unknown, ctx: unknown) => unknown | Promise<unknown>;
-
-interface PiRegisteredTool {
-  name: string;
-  label: string;
-  description: string;
-  promptSnippet: string;
-  promptGuidelines: string[];
-  parameters: unknown;
-  execute(
-    toolCallId: string,
-    input: unknown,
-  ): Promise<{
-    content: { type: "text"; text: string }[];
-    details: unknown;
-  }>;
-}
-
-interface PiRegisteredCommand {
-  description?: string;
-  handler(args: string, ctx: PiCommandContext): Promise<void>;
-}
-
-interface PiCommandContext {
-  ui?: {
-    notify?: (message: string, level?: string) => void;
-  };
-  cwd?: string;
-}
-
-export interface PiExtensionApi {
-  on(event: string, handler: PiEventHandler): void;
-  registerTool(tool: PiRegisteredTool): void;
-  registerCommand(name: string, config: PiRegisteredCommand): void;
-  exec: (
-    cmd: string,
-    args: string[],
-    opts?: { timeout?: number },
-  ) => Promise<{ stdout: string; code: number }>;
-  cwd?: string;
-}
-
-// ---------------------------------------------------------------------------
-// Default export — Called by PI with its ExtensionAPI instance at startup.
-// This stub version logs load and does nothing else, ensuring no-op safety
-// When the extension is inactive.
-// ---------------------------------------------------------------------------
+export type { PiCommandContext, PiExtensionApi } from "./types.js";
 
 export default function verifierExtension(pi: PiExtensionApi): void {
   // eslint-disable-next-line no-console
-  console.log("[pi-verifier] Extension loaded (no-op stub)");
+  console.log("[pi-verifier] Extension loaded");
 
-  // Register a no-op /verify command for future milestone wiring
-  pi.registerCommand("verify", {
-    description: "Toggle verifier mode (stub — no-op)",
-    handler(_args, ctx) {
-      const notify = ctx.ui && ctx.ui.notify;
-      if (notify) {
-        notify("[pi-verifier] Verifier is not yet implemented.", "info");
-      }
-      return Promise.resolve();
-    },
+  const state: VerifierState = {
+    mode: "off",
+    port: 9876,
+    server: undefined,
+    clients: [],
+    buffer: [],
+    bufferTtlMs: 30000,
+  };
+
+  const onEnable = async (): Promise<void> => {
+    await startSocketServer({ state });
+  };
+
+  const onDisable = (): void => {
+    stopSocketServer({ state });
+  };
+
+  const toggleCmd = createToggleCommand({ state, pi, onEnable, onDisable });
+  pi.registerCommand(toggleCmd.name, {
+    description: toggleCmd.description,
+    handler: toggleCmd.handler,
+  });
+
+  const hooks = createSessionCaptureHooks({ state });
+  pi.on("session_start", hooks.sessionStartHandler);
+  pi.on("turn_end", hooks.turnEndHandler);
+  pi.on("input", hooks.inputHandler);
+
+  // Status update interval
+  let statusInterval: ReturnType<typeof setInterval> | undefined = undefined;
+  pi.on("session_start", (_event, ctx) => {
+    const setStatus = (ctx as { ui?: { setStatus?: (s: string) => void } }).ui?.setStatus;
+    if (setStatus) {
+      updateStatus(state, setStatus);
+      statusInterval = setInterval(() => updateStatus(state, setStatus), 1000);
+    }
+  });
+
+  pi.on("session_shutdown", () => {
+    if (statusInterval) {
+      clearInterval(statusInterval);
+      statusInterval = undefined;
+    }
+    if (state.mode !== "off") {
+      onDisable();
+      state.mode = "off";
+    }
   });
 }

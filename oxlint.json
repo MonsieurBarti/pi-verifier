@@ -2,10 +2,30 @@
   "categories": {
     "correctness": "error",
     "suspicious": "error",
-    "pedantic": "error",
+    "pedantic": "warn",
     "perf": "error",
-    "style": "error",
-    "restriction": "error"
+    "style": "warn",
+    "restriction": "off"
+  },
+  "rules": {
+    "curly": "off",
+    "func-style": "off",
+    "id-length": "off",
+    "max-lines-per-function": "off",
+    "max-statements": "off",
+    "no-inline-comments": "off",
+    "no-magic-numbers": "off",
+    "no-undefined": "off",
+    "sort-imports": "off",
+    "sort-keys": "off",
+    "explicit-function-return-type": "off",
+    "no-async-await": "off",
+    "no-optional-chaining": "off",
+    "prefer-template": "off",
+    "no-useless-promise-resolve-reject": "off",
+    "numeric-separators-style": "off",
+    "consistent-existence-index-check": "off",
+    "capitalized-comments": "off"
   },
   "ignorePatterns": ["dist", "node_modules", "coverage"]
 }

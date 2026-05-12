@@ -6,18 +6,21 @@
 ## Approaches Tested
 
 ### 1. TCP Loopback (Selected)
+
 - **Mechanism:** Builder opens TCP server on 127.0.0.1. Verifier connects as client. Messages are JSON lines over TCP.
 - **Latency:** 43/50 messages received, avg **0ms**, max **1ms**
 - **Pros:** True real-time streaming, cross-platform, no polling overhead, sub-millisecond latency
 - **Cons:** Requires port management, verifier must connect before builder starts sending (minor race condition)
 
 ### 2. File-based JSONL (Rejected)
+
 - **Mechanism:** Builder appends JSON lines to `session.jsonl`. Verifier polls file every 50ms.
 - **Latency:** 50/50 messages received, avg **79ms**, max **670ms**
 - **Pros:** Dead simple, no networking code, works everywhere
 - **Cons:** Polling overhead, disk I/O, max latency exceeds 500ms requirement (670ms spike on first read), not truly real-time
 
 ### 3. Unix Domain Socket (Not tested — optional future enhancement)
+
 - **Mechanism:** Similar to TCP but uses filesystem socket. Lower latency than TCP on same machine.
 - **Latency:** N/A (not tested)
 - **Pros:** Fastest possible local IPC, no port conflicts
