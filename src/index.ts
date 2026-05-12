@@ -12,8 +12,7 @@ import { createStatusUI } from "./status-ui.js";
 export type { ExtensionAPI, ExtensionContext } from "./types.js";
 
 export default function verifierExtension(pi: ExtensionAPI): void {
-  // eslint-disable-next-line no-console
-  console.log("[pi-verifier] Extension loaded");
+  // Extension loaded — state initialized below
 
   const state: VerifierState = {
     mode: "off",
@@ -70,6 +69,9 @@ export default function verifierExtension(pi: ExtensionAPI): void {
   let statusInterval: ReturnType<typeof setInterval> | undefined = undefined;
   pi.on("session_start", (_event, ctx) => {
     ctx.ui.setStatus("verifier", statusUI.formatStatus(state));
+    if (statusInterval) {
+      clearInterval(statusInterval);
+    }
     statusInterval = setInterval(() => {
       const ctxCurrent = state.lastContext;
       if (!ctxCurrent) return;

@@ -1,23 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { startVerifier, stopVerifier } from "../src/verifier-spawn.js";
-import type { VerifierState } from "../src/types.js";
-
-const makeState = (): VerifierState => ({
-  mode: "off",
-  port: 9876,
-  server: undefined,
-  clients: [],
-  buffer: [],
-  bufferTtlMs: 30000,
-  verifierProcess: undefined,
-  pendingVerification: false,
-  lastFeedbackInjectedAt: 0,
-  feedbackCooldownMs: 5000,
-  verificationAttempts: 0,
-  maxVerificationAttempts: 3,
-  escalationPaused: false,
-  lastContext: undefined,
-});
+import { makeMockState } from "./mocks/fixtures.js";
 
 const mockProcs: {
   listeners: Record<string, ((...args: unknown[]) => void)[]>;
@@ -53,7 +36,7 @@ beforeEach(() => {
 
 describe("verifier-spawn", () => {
   it("should set verifierProcess on start", () => {
-    const state = makeState();
+    const state = makeMockState();
     expect(state.verifierProcess).toBeUndefined();
     startVerifier({ state });
     expect(state.verifierProcess).toBeDefined();
@@ -61,7 +44,7 @@ describe("verifier-spawn", () => {
   });
 
   it("should be a no-op when already running", () => {
-    const state = makeState();
+    const state = makeMockState();
     startVerifier({ state });
     const [firstProc] = mockProcs;
     startVerifier({ state });
@@ -70,8 +53,7 @@ describe("verifier-spawn", () => {
   });
 
   it("should kill the process and clear state", () => {
-    const state = makeState();
-    state.mode = "active";
+    const state = makeMockState({ mode: "active" });
     startVerifier({ state });
     expect(state.verifierProcess).toBeDefined();
     stopVerifier({ state });
@@ -80,8 +62,7 @@ describe("verifier-spawn", () => {
   });
 
   it("should update state to waiting on process exit", () => {
-    const state = makeState();
-    state.mode = "active";
+    const state = makeMockState({ mode: "active" });
     startVerifier({ state });
     const { listeners } = mockProcs[0]!;
     const exitListeners = listeners["exit"];
@@ -93,8 +74,7 @@ describe("verifier-spawn", () => {
   });
 
   it("should keep mode as off when process exits while mode is off", () => {
-    const state = makeState();
-    state.mode = "off";
+    const state = makeMockState({ mode: "off" });
     startVerifier({ state });
     const { listeners } = mockProcs[0]!;
     const exitListeners = listeners["exit"];

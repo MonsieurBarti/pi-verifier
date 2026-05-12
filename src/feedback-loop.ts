@@ -18,8 +18,8 @@ export function createFeedbackLoop(deps: FeedbackLoopDeps): FeedbackLoop {
   const onFeedback = (payload: { type: "feedback"; content: string }): void => {
     state.pendingVerification = false;
 
-    if (!payload.content || payload.content.trim() === "") return;
-    if (payload.content.trim() === "LGTM") return;
+    const trimmed = payload.content.trim();
+    if (trimmed === "" || trimmed === "LGTM") return;
 
     const ctx = state.lastContext;
     if (ctx && escalation.checkEscalation(ctx)) return;
@@ -31,7 +31,7 @@ export function createFeedbackLoop(deps: FeedbackLoopDeps): FeedbackLoop {
     });
   };
 
-  const turnEndHandler = (event: TurnEndEvent): void => {
+  const turnEndHandler = (_event: TurnEndEvent): void => {
     if (state.mode !== "active") return;
 
     // Cooldown: skip turns that are follow-ups from our own injected feedback
@@ -46,10 +46,6 @@ export function createFeedbackLoop(deps: FeedbackLoopDeps): FeedbackLoop {
     }
 
     state.pendingVerification = true;
-
-    // Forward turn_end to verifier via TCP (broadcast handled by session-capture)
-    // This handler is called in addition to session-capture's broadcast
-    void event; // silence unused warning — the event is forwarded by broadcast
   };
 
   return { onFeedback, turnEndHandler };

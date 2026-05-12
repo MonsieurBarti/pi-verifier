@@ -1,30 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { createConnection } from "node:net";
 import { startSocketServer, stopSocketServer, broadcast } from "../src/socket-server.js";
-import type { VerifierState } from "../src/types.js";
-
-function makeState(port: number): VerifierState {
-  return {
-    mode: "off",
-    port,
-    server: undefined,
-    clients: [],
-    buffer: [],
-    bufferTtlMs: 30000,
-    verifierProcess: undefined,
-    pendingVerification: false,
-    lastFeedbackInjectedAt: 0,
-    feedbackCooldownMs: 5000,
-    verificationAttempts: 0,
-    maxVerificationAttempts: 3,
-    escalationPaused: false,
-    lastContext: undefined,
-  };
-}
+import { makeMockState } from "./mocks/fixtures.js";
 
 describe("socket-server", () => {
   it("should start and stop without error", async () => {
-    const state = makeState(19876);
+    const state = makeMockState({ port: 19876 });
     await startSocketServer({ state });
     expect(state.server).toBeDefined();
     stopSocketServer({ state });
@@ -32,7 +13,7 @@ describe("socket-server", () => {
   });
 
   it("should buffer when no clients connected", async () => {
-    const state = makeState(19877);
+    const state = makeMockState({ port: 19877 });
     await startSocketServer({ state });
     broadcast({ state }, { turn: 1 });
     expect(state.buffer.length).toBe(1);
@@ -40,8 +21,7 @@ describe("socket-server", () => {
   });
 
   it("should drop old buffered messages past TTL", async () => {
-    const state = makeState(19878);
-    state.bufferTtlMs = 1; // 1ms expiration
+    const state = makeMockState({ port: 19878, bufferTtlMs: 1 });
     await startSocketServer({ state });
     broadcast({ state }, { turn: 1 });
     expect(state.buffer.length).toBe(1); // Just added
@@ -51,12 +31,12 @@ describe("socket-server", () => {
     broadcast({ state }, { turn: 2 });
     // First message should be dropped now because it's past TTL
     expect(state.buffer.length).toBe(1);
-    expect((state.buffer[0] as { data?: { turn?: number } }).data?.turn).toBe(2);
+    expect((state.buffer[0]!.data as { turn?: number }).turn).toBe(2);
     stopSocketServer({ state });
   });
 
   it("should transition mode to waiting when server starts", async () => {
-    const state = makeState(19879);
+    const state = makeMockState({ port: 19879 });
     expect(state.mode).toBe("off");
     await startSocketServer({ state });
     // Mode stays off until a client connects; server is just ready
@@ -65,7 +45,7 @@ describe("socket-server", () => {
   });
 
   it("should call onFeedback when a client sends a feedback JSONL message", async () => {
-    const state = makeState(19883);
+    const state = makeMockState({ port: 19883 });
     const onFeedback = vi.fn();
     await startSocketServer({ state, onFeedback });
 
@@ -95,7 +75,7 @@ describe("socket-server", () => {
   });
 
   it("should ignore malformed JSON lines without crashing", async () => {
-    const state = makeState(19881);
+    const state = makeMockState({ port: 19881 });
     const onFeedback = vi.fn();
     await startSocketServer({ state, onFeedback });
 
@@ -126,7 +106,7 @@ describe("socket-server", () => {
   });
 
   it("should not crash when onFeedback is undefined", async () => {
-    const state = makeState(19882);
+    const state = makeMockState({ port: 19882 });
     await startSocketServer({ state }); // no onFeedback
 
     const client = createConnection({ port: 19882 });

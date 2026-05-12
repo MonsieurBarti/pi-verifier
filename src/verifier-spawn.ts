@@ -19,14 +19,19 @@ export function startVerifier(deps: VerifierSpawnDeps): void {
   state.verifierProcess = proc;
 
   proc.stdout?.on("data", (data) => {
+    // Pipe child stdout to parent console for observability
+    // eslint-disable-next-line no-console
     console.log(`[verifier stdout] ${data.toString().trim()}`);
   });
 
   proc.stderr?.on("data", (data) => {
+    // Pipe child stderr to parent console for observability
+    // eslint-disable-next-line no-console
     console.error(`[verifier stderr] ${data.toString().trim()}`);
   });
 
   proc.on("exit", (code) => {
+    // eslint-disable-next-line no-console
     console.log(`[pi-verifier] Verifier process exited with code ${code}`);
     state.verifierProcess = undefined;
     if (state.mode !== "off") {

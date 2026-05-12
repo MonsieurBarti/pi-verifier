@@ -1,5 +1,11 @@
 import { createServer } from "node:net";
-import { isFeedbackPayload, type FeedbackPayload, type VerifierState } from "./types.js";
+import {
+  isFeedbackPayload,
+  isIpcMessage,
+  toJsonl,
+  type FeedbackPayload,
+  type VerifierState,
+} from "./types.js";
 
 export interface SocketServerDeps {
   state: VerifierState;
@@ -18,7 +24,7 @@ export function startSocketServer(deps: SocketServerDeps): Promise<void> {
 
       // Flush any buffered messages to the new client
       for (const msg of state.buffer) {
-        socket.write(JSON.stringify(msg) + "\n");
+        socket.write(toJsonl(msg));
       }
       state.buffer = []; // Clear buffer after flush
 
@@ -26,11 +32,8 @@ export function startSocketServer(deps: SocketServerDeps): Promise<void> {
         if (!line.trim()) return;
         try {
           const parsed = JSON.parse(line);
-          if (typeof parsed === "object" && parsed !== null && "data" in parsed) {
-            const data = Reflect.get(parsed, "data");
-            if (isFeedbackPayload(data)) {
-              deps.onFeedback?.(data);
-            }
+          if (isIpcMessage(parsed) && isFeedbackPayload(parsed.data)) {
+            deps.onFeedback?.(parsed.data);
           }
         } catch {
           // ignore malformed JSON lines
@@ -81,21 +84,13 @@ export function broadcast(deps: SocketServerDeps, data: unknown): void {
   const msg = { timestamp: Date.now(), data };
 
   if (state.clients.length > 0) {
-    const line = JSON.stringify(msg) + "\n";
+    const line = toJsonl(msg);
     for (const client of state.clients) {
       client.write(line);
     }
   } else {
-    // Buffer if no clients connected; drop old messages past TTL
     state.buffer.push(msg);
     const cutoff = Date.now() - state.bufferTtlMs;
-    state.buffer = state.buffer.filter((m) => {
-      if (typeof m !== "object" || m === null) return false;
-      const ts = Reflect.get(m, "timestamp");
-      if (typeof ts === "number") {
-        return ts > cutoff;
-      }
-      return false;
-    });
+    state.buffer = state.buffer.filter((m) => m.timestamp > cutoff);
   }
 }

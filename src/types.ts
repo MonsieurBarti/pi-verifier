@@ -26,21 +26,25 @@ export type {
 // Verifier extension-specific types
 // ---------------------------------------------------------------------------
 
-export type VerifierMode = "off" | "waiting" | "active";
+export const MODES = {
+  OFF: "off",
+  WAITING: "waiting",
+  ACTIVE: "active",
+} as const;
+
+export type VerifierMode = (typeof MODES)[keyof typeof MODES];
 
 export interface VerifierState {
   mode: VerifierMode;
   port: number;
   server: Server | undefined;
   clients: Socket[];
-  buffer: unknown[];
+  buffer: { timestamp: number; data: unknown }[];
   bufferTtlMs: number;
-  // NEW fields for M4
   verifierProcess: ChildProcess | undefined;
   pendingVerification: boolean;
   lastFeedbackInjectedAt: number;
   feedbackCooldownMs: number;
-  // NEW fields for M5
   verificationAttempts: number;
   maxVerificationAttempts: number;
   escalationPaused: boolean;
@@ -54,7 +58,7 @@ export interface SessionEvent {
 }
 
 // ---------------------------------------------------------------------------
-// IPC message types for M4 (Task 1 + Task 2)
+// IPC message types
 // ---------------------------------------------------------------------------
 
 export interface IpcMessage {
@@ -71,6 +75,14 @@ export type IpcPayload =
 export interface FeedbackPayload {
   type: "feedback";
   content: string;
+}
+
+// ---------------------------------------------------------------------------
+// Serialization helper
+// ---------------------------------------------------------------------------
+
+export function toJsonl(obj: unknown): string {
+  return JSON.stringify(obj) + "\n";
 }
 
 // ---------------------------------------------------------------------------

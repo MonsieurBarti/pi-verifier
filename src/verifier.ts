@@ -1,3 +1,11 @@
+// ---------------------------------------------------------------------------
+// Verifier daemon — process entry point
+//
+// This module is spawned as a child process by verifier-spawn.ts. It runs
+// independently with its own AgentSession and communicates with the builder
+// over TCP loopback via JSON Lines.
+// ---------------------------------------------------------------------------
+
 import { createConnection } from "node:net";
 import { createInterface } from "node:readline";
 import { createAgentSession, type AgentSession } from "@earendil-works/pi-coding-agent";
@@ -5,6 +13,7 @@ import { loadPersona, loadPrompt } from "./prompt-loader.js";
 import {
   isAssistantMessage,
   isIpcMessage,
+  toJsonl,
   type IpcMessage,
   type IpcPayload,
   type TurnEndEvent,
@@ -30,10 +39,12 @@ rl.on("line", (line) => {
 });
 
 client.on("connect", () => {
+  // eslint-disable-next-line no-console
   console.log("[verifier] Connected to builder");
 });
 
 client.on("close", () => {
+  // eslint-disable-next-line no-console
   console.log("[verifier] Disconnected, exiting");
   process.exit(0);
 });
@@ -44,13 +55,16 @@ async function initSession(): Promise<void> {
     tools: ["read", "grep", "find", "ls"],
   });
   session = createdSession;
+  // eslint-disable-next-line no-console
   console.log("[verifier] AgentSession created with read-only tools");
+  // eslint-disable-next-line no-console
   console.log("[verifier] Active tools:", session.getActiveToolNames().join(", "));
 }
 
 try {
   await initSession();
 } catch (error: unknown) {
+  // eslint-disable-next-line no-console
   console.error(
     "[verifier] Failed to create session:",
     error instanceof Error ? error.message : String(error),
@@ -82,7 +96,7 @@ async function handleTurnEnd(event: TurnEndEvent): Promise<void> {
     timestamp: Date.now(),
     data: { type: "feedback", content: feedback },
   };
-  client.write(JSON.stringify(response) + "\n");
+  client.write(toJsonl(response));
 }
 
 function runVerificationPrompt(agentSession: AgentSession, promptText: string): Promise<string> {
