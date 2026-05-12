@@ -37,6 +37,8 @@ temp/
 .worktrees/
 .pi/
 docs/
+!docs/engineering-discipline/
+!docs/engineering-discipline/**
 # Spike artifacts
 spike/
 *.jsonl
