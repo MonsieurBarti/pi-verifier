@@ -15,6 +15,8 @@ export const makeMockState = (overrides?: Partial<VerifierState>): VerifierState
   restartDelayMs: 1000,
   restartCount: 0,
   dangerousTools: new Set(["write", "edit", "bash"]),
+  allowedTools: new Set(["read", "grep", "find", "ls"]),
+  toolPolicyMode: "block",
   sessionHistory: [],
   server: undefined,
   clients: [],
@@ -48,6 +50,9 @@ export const makeMockCtx = (): ExtensionContext =>
       setWidget: vi.fn(),
       setWorkingIndicator: vi.fn(),
       setWorkingMessage: vi.fn(),
+    },
+    sessionManager: {
+      getSessionId: vi.fn(() => "mock-session"),
     },
     cwd: "/tmp",
   });

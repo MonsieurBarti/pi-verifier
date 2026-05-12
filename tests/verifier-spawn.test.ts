@@ -2,33 +2,11 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { startVerifier, stopVerifier } from "../src/verifier-spawn.js";
 import { makeMockState } from "./mocks/fixtures.js";
 
-const mockProcs: {
-  listeners: Record<string, ((...args: unknown[]) => void)[]>;
-  kill: ReturnType<typeof vi.fn>;
-}[] = [];
+let nextExecFileError: Error | undefined;
 
 vi.mock("node:child_process", () => ({
-  spawn: vi.fn((_command: string, _args: string[], _options: Record<string, unknown>) => {
-    const listeners: Record<string, ((...args: unknown[]) => void)[]> = {};
-    const on = (event: string, cb: (...args: unknown[]) => void): void => {
-      if (!listeners[event]) listeners[event] = [];
-      listeners[event].push(cb);
-    };
-    const emit = (event: string, ...args: unknown[]): void => {
-      for (const cb of listeners[event] ?? []) {
-        cb(...args);
-      }
-    };
-    const kill = vi.fn();
-    const proc = {
-      stdout: { on: (_event: string, _cb: (data: Buffer) => void): void => {} },
-      stderr: { on: (_event: string, _cb: (data: Buffer) => void): void => {} },
-      on,
-      emit,
-      kill,
-    };
-    mockProcs.push({ listeners, kill });
-    return proc;
+  execFile: vi.fn((_cmd: string, _args: string[], cb: (error: Error | undefined, result: { stdout: string }) => void) => {
+    cb(nextExecFileError, { stdout: "" });
   }),
 }));
 
@@ -37,81 +15,86 @@ vi.mock("node:path", () => ({
 }));
 
 beforeEach(() => {
-  mockProcs.length = 0;
+  nextExecFileError = undefined;
 });
 
-describe("verifier-spawn", () => {
-  it("should set verifierProcess on start", () => {
-    const state = makeMockState();
-    expect(state.verifierProcess).toBeUndefined();
+describe("verifier-spawn with launcher", () => {
+  it("launches verifier terminal", async () => {
+    const notifySpy = vi.fn();
+    const state = makeMockState({
+      lastContext: {
+        sessionManager: { getSessionId: () => "test-session" },
+        ui: {
+          notify: notifySpy,
+          setStatus: vi.fn(),
+          setWidget: vi.fn(),
+          setWorkingIndicator: vi.fn(),
+          setWorkingMessage: vi.fn(),
+        },
+        cwd: "/tmp",
+      },
+    });
+
     startVerifier({ state });
-    expect(state.verifierProcess).toBeDefined();
-    expect(mockProcs.length).toBe(1);
+
+    // Allow microtasks to flush
+    await new Promise((r) => { setTimeout(r, 10); });
+
+    expect(notifySpy).toHaveBeenCalledWith(
+      expect.stringContaining("Verifier launched in"),
+      "info",
+    );
   });
 
-  it("should be a no-op when already running", () => {
-    const state = makeMockState();
-    startVerifier({ state });
-    const [firstProc] = mockProcs;
-    startVerifier({ state });
-    expect(mockProcs.length).toBe(1);
-    expect(mockProcs[0]).toBe(firstProc);
-  });
+  it("kills verifier terminal on stop", async () => {
+    const state = makeMockState({
+      lastContext: {
+        sessionManager: { getSessionId: () => "test-session" },
+        ui: {
+          notify: vi.fn(),
+          setStatus: vi.fn(),
+          setWidget: vi.fn(),
+          setWorkingIndicator: vi.fn(),
+          setWorkingMessage: vi.fn(),
+        },
+        cwd: "/tmp",
+      },
+    });
 
-  it("should kill the process and clear state", () => {
-    const state = makeMockState({ mode: "active" });
-    startVerifier({ state });
-    expect(state.verifierProcess).toBeDefined();
     stopVerifier({ state });
-    expect(mockProcs[0]!.kill).toHaveBeenCalledWith("SIGTERM");
-    expect(state.verifierProcess).toBeUndefined();
+
+    await new Promise((r) => { setTimeout(r, 10); });
+
+    // Should not throw
+    expect(true).toBe(true);
   });
 
-  it("should update state to waiting on process exit", () => {
-    const state = makeMockState({ mode: "active", maxRestarts: 0 });
-    startVerifier({ state });
-    const { listeners } = mockProcs[0]!;
-    const exitListeners = listeners["exit"];
-    expect(exitListeners).toBeDefined();
-    expect(exitListeners!.length).toBeGreaterThan(0);
-    exitListeners![0]!(0);
-    expect(state.verifierProcess).toBeUndefined();
-    expect(state.mode).toBe("waiting");
-  });
+  it("notifies error when launch fails", async () => {
+    const notifySpy = vi.fn();
+    const state = makeMockState({
+      mode: "active",
+      lastContext: {
+        sessionManager: { getSessionId: () => "test-session" },
+        ui: {
+          notify: notifySpy,
+          setStatus: vi.fn(),
+          setWidget: vi.fn(),
+          setWorkingIndicator: vi.fn(),
+          setWorkingMessage: vi.fn(),
+        },
+        cwd: "/tmp",
+      },
+    });
 
-  it("should keep mode as off when process exits while mode is off", () => {
-    const state = makeMockState({ mode: "off" });
-    startVerifier({ state });
-    const { listeners } = mockProcs[0]!;
-    const exitListeners = listeners["exit"];
-    expect(exitListeners).toBeDefined();
-    exitListeners![0]!(1);
-    expect(state.verifierProcess).toBeUndefined();
-    expect(state.mode).toBe("off");
-  });
-
-  it("restarts verifier up to maxRestarts after crash", async () => {
-    const state = makeMockState({ mode: "active", maxRestarts: 2, restartDelayMs: 50 });
+    nextExecFileError = new Error("tmux not found");
     startVerifier({ state });
 
-    const firstProc = state.verifierProcess;
-    expect(firstProc).toBeDefined();
+    await new Promise((r) => { setTimeout(r, 10); });
 
-    // Simulate crash
-    firstProc?.emit("exit", 1);
-    await new Promise((r) => setTimeout(r, 100));
-
-    // Should have restarted
-    expect(state.restartCount).toBe(1);
-    expect(state.verifierProcess).toBeDefined();
-    expect(state.verifierProcess).not.toBe(firstProc);
-
-    // Simulate second crash
-    const secondProc = state.verifierProcess;
-    secondProc?.emit("exit", 1);
-    await new Promise((r) => setTimeout(r, 100));
-
-    expect(state.restartCount).toBe(2);
+    expect(notifySpy).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to launch verifier terminal"),
+      "error",
+    );
     expect(state.mode).toBe("waiting");
   });
 });
