@@ -37,3 +37,6 @@ temp/
 .worktrees/
 .pi/
 docs/
+# Spike artifacts
+spike/
+*.jsonl
