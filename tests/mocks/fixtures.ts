@@ -23,6 +23,7 @@ export const makeMockState = (overrides?: Partial<VerifierState>): VerifierState
   buffer: [],
   bufferTtlMs: 30000,
   verifierProcess: undefined,
+  verifierSessionId: undefined,
   pendingVerification: false,
   lastFeedbackInjectedAt: 0,
   feedbackCooldownMs: 5000,

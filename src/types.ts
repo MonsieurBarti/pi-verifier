@@ -50,6 +50,7 @@ export interface VerifierState {
   buffer: { timestamp: number; data: unknown }[];
   bufferTtlMs: number;
   verifierProcess: ChildProcess | undefined;
+  verifierSessionId: string | undefined;
   pendingVerification: boolean;
   lastFeedbackInjectedAt: number;
   feedbackCooldownMs: number;

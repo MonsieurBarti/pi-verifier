@@ -48,6 +48,7 @@ export default function verifierExtension(
     buffer: [],
     bufferTtlMs: options?.bufferTtlMs ?? 30000,
     verifierProcess: undefined,
+    verifierSessionId: undefined,
     pendingVerification: false,
     lastFeedbackInjectedAt: 0,
     feedbackCooldownMs: options?.feedbackCooldownMs ?? 5000,
@@ -66,7 +67,7 @@ export default function verifierExtension(
 
   const onEnable = async (): Promise<void> => {
     await startSocketServerWithFallback({ state, onFeedback: feedbackLoop.onFeedback });
-    startVerifier({ state });
+    await startVerifier({ state });
     pi.registerTool(verifierPromptTool);
   };
 
@@ -86,9 +87,12 @@ export default function verifierExtension(
   };
 
   const onLaunch = (cmdCtx: ExtensionCommandContext): void => {
-    const sessionId = cmdCtx.sessionManager?.getSessionId();
+    const sessionId = state.verifierSessionId;
     if (!sessionId) {
-      cmdCtx.ui.notify("[pi-verifier] No active session ID.", "warning");
+      cmdCtx.ui.notify(
+        "[pi-verifier] Verifier is not running. Enable it first with /verify on",
+        "warning",
+      );
       return;
     }
     const attachCmd = getTmuxAttachCommand(sessionId);

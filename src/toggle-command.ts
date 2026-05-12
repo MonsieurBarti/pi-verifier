@@ -32,6 +32,8 @@ export function createToggleCommand(deps: ToggleCommandDeps): ToggleCommand {
           return;
         }
         state.mode = "waiting";
+        state.verifierSessionId =
+          (ctx.sessionManager?.getSessionId() as string | undefined) ?? "unknown";
         await onEnable();
         ctx.ui.notify(
           "[pi-verifier] Verifier mode enabled. Waiting for verifier connection...",

@@ -16,6 +16,16 @@ vi.mock("node:child_process", () => ({
   ),
 }));
 
+vi.mock("node:fs/promises", () => ({
+  access: vi.fn(() => Promise.resolve()),
+  writeFile: vi.fn(() => Promise.resolve()),
+  readFile: vi.fn(() => Promise.resolve("")),
+}));
+
+vi.mock("node:os", () => ({
+  tmpdir: vi.fn(() => "/tmp"),
+}));
+
 vi.mock("node:path", () => ({
   join: vi.fn(() => "/mock/verifier.js"),
 }));
@@ -28,6 +38,7 @@ describe("verifier-spawn with launcher", () => {
   it("launches verifier terminal", async () => {
     const notifySpy = vi.fn();
     const state = makeMockState({
+      verifierSessionId: "test-session",
       lastContext: {
         sessionManager: { getSessionId: () => "test-session" },
         ui: {
@@ -41,21 +52,38 @@ describe("verifier-spawn with launcher", () => {
       },
     });
 
-    startVerifier({ state });
-
-    // Allow microtasks to flush
-    await new Promise((r) => {
-      setTimeout(r, 10);
-    });
+    await startVerifier({ state });
 
     expect(notifySpy).toHaveBeenCalledWith(
-      expect.stringContaining("Verifier running in tmux session"),
+      expect.stringContaining("Verifier launched in tmux session"),
       "info",
     );
   });
 
-  it("kills verifier terminal on stop", async () => {
+  it("warns when no session ID is set", async () => {
+    const notifySpy = vi.fn();
     const state = makeMockState({
+      verifierSessionId: undefined,
+      lastContext: {
+        ui: {
+          notify: notifySpy,
+          setStatus: vi.fn(),
+          setWidget: vi.fn(),
+          setWorkingIndicator: vi.fn(),
+          setWorkingMessage: vi.fn(),
+        },
+        cwd: "/tmp",
+      },
+    });
+
+    await startVerifier({ state });
+
+    expect(notifySpy).toHaveBeenCalledWith(expect.stringContaining("No session ID"), "warning");
+  });
+
+  it("kills verifier terminal on stop and clears session ID", async () => {
+    const state = makeMockState({
+      verifierSessionId: "test-session",
       lastContext: {
         sessionManager: { getSessionId: () => "test-session" },
         ui: {
@@ -75,14 +103,14 @@ describe("verifier-spawn with launcher", () => {
       setTimeout(r, 10);
     });
 
-    // Should not throw
-    expect(true).toBe(true);
+    expect(state.verifierSessionId).toBeUndefined();
   });
 
   it("notifies error when launch fails", async () => {
     const notifySpy = vi.fn();
     const state = makeMockState({
       mode: "active",
+      verifierSessionId: "test-session",
       lastContext: {
         sessionManager: { getSessionId: () => "test-session" },
         ui: {
@@ -97,11 +125,7 @@ describe("verifier-spawn with launcher", () => {
     });
 
     nextExecFileError = new Error("tmux not found");
-    startVerifier({ state });
-
-    await new Promise((r) => {
-      setTimeout(r, 10);
-    });
+    await startVerifier({ state });
 
     expect(notifySpy).toHaveBeenCalledWith(
       expect.stringContaining("Failed to launch verifier"),

@@ -21,8 +21,7 @@ describe("launcher", () => {
 
     const result = await launchVerifierTerminal({
       sessionId: "abc",
-      verifierScriptPath: "/dev/null",
-      port: 9876,
+      verifierCommand: "bash /mock/wrapper.sh",
     });
     expect(result.tmuxSession).toBe("pi-verifier-abc");
   });
@@ -40,8 +39,7 @@ describe("launcher", () => {
 
     const result = await launchVerifierTerminal({
       sessionId: "xyz",
-      verifierScriptPath: "/dev/null",
-      port: 9876,
+      verifierCommand: "bash /mock/wrapper.sh",
     });
     expect(result.tmuxSession).toBe("pi-verifier-xyz");
   });

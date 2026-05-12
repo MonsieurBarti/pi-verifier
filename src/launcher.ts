@@ -5,8 +5,7 @@ const execFileP = promisify(execFile);
 
 export interface LauncherDeps {
   sessionId: string;
-  verifierScriptPath: string;
-  port: number;
+  verifierCommand: string;
 }
 
 export interface LaunchResult {
@@ -19,7 +18,7 @@ export interface LaunchResult {
  * the attach command and paste it into their preferred terminal (Warp, iTerm, etc.).
  */
 export async function launchVerifierTerminal(deps: LauncherDeps): Promise<LaunchResult> {
-  const { sessionId, verifierScriptPath, port } = deps;
+  const { sessionId, verifierCommand } = deps;
   const tmuxSession = `pi-verifier-${sessionId}`;
 
   // Idempotency: if already running, return existing
@@ -27,10 +26,17 @@ export async function launchVerifierTerminal(deps: LauncherDeps): Promise<Launch
     return { tmuxSession };
   }
 
-  const command = `PI_VERIFIER_PORT=${port} node ${verifierScriptPath}`;
-
-  // Create a detached tmux session that survives even if we disconnect
-  await execFileP("tmux", ["new-session", "-d", "-s", tmuxSession, "-c", process.cwd(), command]);
+  // Create a detached tmux session that survives even if we disconnect.
+  // verifierCommand is a shell-ready string like `bash /tmp/xxx.spawn.sh`.
+  await execFileP("tmux", [
+    "new-session",
+    "-d",
+    "-s",
+    tmuxSession,
+    "-c",
+    process.cwd(),
+    verifierCommand,
+  ]);
   await applyVerifierTmuxOptions(tmuxSession);
 
   return { tmuxSession };
