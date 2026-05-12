@@ -16,8 +16,13 @@ vi.mock("node:child_process", () => ({
   ),
 }));
 
+let accessShouldFail = false;
+
 vi.mock("node:fs/promises", () => ({
-  access: vi.fn(() => Promise.resolve()),
+  access: vi.fn(() => {
+    if (accessShouldFail) return Promise.reject(new Error("ENOENT"));
+    return Promise.resolve();
+  }),
   writeFile: vi.fn(() => Promise.resolve()),
   readFile: vi.fn(() => Promise.resolve("")),
 }));
@@ -32,6 +37,7 @@ vi.mock("node:path", () => ({
 
 beforeEach(() => {
   nextExecFileError = undefined;
+  accessShouldFail = false;
 });
 
 describe("verifier-spawn with launcher", () => {
@@ -132,5 +138,31 @@ describe("verifier-spawn with launcher", () => {
       "error",
     );
     expect(state.mode).toBe("waiting");
+  });
+
+  it("notifies error when verifier script is not found in any candidate path", async () => {
+    const notifySpy = vi.fn();
+    const state = makeMockState({
+      verifierSessionId: "test-session",
+      lastContext: {
+        sessionManager: { getSessionId: () => "test-session" },
+        ui: {
+          notify: notifySpy,
+          setStatus: vi.fn(),
+          setWidget: vi.fn(),
+          setWorkingIndicator: vi.fn(),
+          setWorkingMessage: vi.fn(),
+        },
+        cwd: "/tmp",
+      },
+    });
+
+    accessShouldFail = true;
+    await startVerifier({ state });
+
+    expect(notifySpy).toHaveBeenCalledWith(
+      expect.stringContaining("Verifier script not found"),
+      "error",
+    );
   });
 });
