@@ -2,6 +2,8 @@ import type { ExtensionAPI, VerifierState } from "./types.js";
 import { createToggleCommand } from "./toggle-command.js";
 import { startSocketServer, stopSocketServer } from "./socket-server.js";
 import { createSessionCaptureHooks } from "./session-capture.js";
+import { startVerifier, stopVerifier } from "./verifier-spawn.js";
+import { createFeedbackLoop } from "./feedback-loop.js";
 
 export type { ExtensionAPI, ExtensionContext } from "./types.js";
 
@@ -16,13 +18,21 @@ export default function verifierExtension(pi: ExtensionAPI): void {
     clients: [],
     buffer: [],
     bufferTtlMs: 30000,
+    verifierProcess: undefined,
+    pendingVerification: false,
+    lastFeedbackInjectedAt: 0,
+    feedbackCooldownMs: 5000,
   };
 
+  const feedbackLoop = createFeedbackLoop({ state, pi });
+
   const onEnable = async (): Promise<void> => {
-    await startSocketServer({ state });
+    await startSocketServer({ state, onFeedback: feedbackLoop.onFeedback });
+    startVerifier({ state });
   };
 
   const onDisable = (): void => {
+    stopVerifier({ state });
     stopSocketServer({ state });
   };
 
@@ -32,7 +42,7 @@ export default function verifierExtension(pi: ExtensionAPI): void {
     handler: toggleCmd.handler,
   });
 
-  const hooks = createSessionCaptureHooks({ state });
+  const hooks = createSessionCaptureHooks({ state, onTurnEnd: feedbackLoop.turnEndHandler });
   pi.on("session_start", hooks.sessionStartHandler);
   pi.on("turn_end", hooks.turnEndHandler);
   pi.on("input", hooks.inputHandler);

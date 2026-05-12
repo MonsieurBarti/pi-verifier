@@ -1,8 +1,9 @@
 import { createServer } from "node:net";
-import type { VerifierState } from "./types.js";
+import type { FeedbackPayload, VerifierState } from "./types.js";
 
 export interface SocketServerDeps {
   state: VerifierState;
+  onFeedback?: (payload: FeedbackPayload) => void;
 }
 
 export function startSocketServer(deps: SocketServerDeps): Promise<void> {
@@ -13,12 +14,32 @@ export function startSocketServer(deps: SocketServerDeps): Promise<void> {
     const server = createServer((socket) => {
       state.clients.push(socket);
       state.mode = "active";
+      let inboundBuffer = "";
 
       // Flush any buffered messages to the new client
       for (const msg of state.buffer) {
         socket.write(JSON.stringify(msg) + "\n");
       }
       state.buffer = []; // Clear buffer after flush
+
+      socket.on("data", (chunk) => {
+        inboundBuffer += chunk.toString();
+        const lines = inboundBuffer.split("\n");
+        inboundBuffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const parsed = JSON.parse(line) as { data?: unknown };
+              const payload = parsed.data as FeedbackPayload | undefined;
+              if (payload && payload.type === "feedback") {
+                deps.onFeedback?.(payload);
+              }
+            } catch {
+              // ignore malformed JSON lines
+            }
+          }
+        }
+      });
 
       socket.on("close", () => {
         const idx = state.clients.indexOf(socket);

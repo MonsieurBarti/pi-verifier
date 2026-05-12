@@ -3,7 +3,18 @@ import { formatStatus } from "../src/status-ui.js";
 import type { VerifierState } from "../src/types.js";
 
 function makeState(mode: VerifierState["mode"]): VerifierState {
-  return { mode, port: 9876, server: undefined, clients: [], buffer: [], bufferTtlMs: 30000 };
+  return {
+    mode,
+    port: 9876,
+    server: undefined,
+    clients: [],
+    buffer: [],
+    bufferTtlMs: 30000,
+    verifierProcess: undefined,
+    pendingVerification: false,
+    lastFeedbackInjectedAt: 0,
+    feedbackCooldownMs: 5000,
+  };
 }
 
 describe("status-ui", () => {

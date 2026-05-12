@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { createConnection } from "node:net";
 import { startSocketServer, stopSocketServer, broadcast } from "../src/socket-server.js";
 import type { VerifierState } from "../src/types.js";
 
@@ -10,6 +11,10 @@ function makeState(port: number): VerifierState {
     clients: [],
     buffer: [],
     bufferTtlMs: 30000,
+    verifierProcess: undefined,
+    pendingVerification: false,
+    lastFeedbackInjectedAt: 0,
+    feedbackCooldownMs: 5000,
   };
 }
 
@@ -52,6 +57,93 @@ describe("socket-server", () => {
     await startSocketServer({ state });
     // Mode stays off until a client connects; server is just ready
     expect(state.server).toBeDefined();
+    stopSocketServer({ state });
+  });
+
+  it("should call onFeedback when a client sends a feedback JSONL message", async () => {
+    const state = makeState(19883);
+    const onFeedback = vi.fn();
+    await startSocketServer({ state, onFeedback });
+
+    const client = createConnection({ port: 19883 });
+    await new Promise<void>((resolve, reject) => {
+      client.on("connect", resolve);
+      client.on("error", reject);
+    });
+
+    // Wait for server to register the client
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
+
+    const msg = { timestamp: Date.now(), data: { type: "feedback", content: "test feedback" } };
+    client.write(JSON.stringify(msg) + "\n");
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 200);
+    });
+
+    expect(onFeedback).toHaveBeenCalledTimes(1);
+    expect(onFeedback).toHaveBeenCalledWith({ type: "feedback", content: "test feedback" });
+
+    client.destroy();
+    stopSocketServer({ state });
+  });
+
+  it("should ignore malformed JSON lines without crashing", async () => {
+    const state = makeState(19881);
+    const onFeedback = vi.fn();
+    await startSocketServer({ state, onFeedback });
+
+    const client = createConnection({ port: 19881 });
+    await new Promise<void>((resolve, reject) => {
+      client.on("connect", resolve);
+      client.on("error", reject);
+    });
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
+
+    client.write("this is not json\n");
+    client.write(
+      JSON.stringify({ timestamp: 1, data: { type: "feedback", content: "ok" } }) + "\n",
+    );
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
+
+    expect(onFeedback).toHaveBeenCalledTimes(1);
+    expect(onFeedback).toHaveBeenCalledWith({ type: "feedback", content: "ok" });
+
+    client.destroy();
+    stopSocketServer({ state });
+  });
+
+  it("should not crash when onFeedback is undefined", async () => {
+    const state = makeState(19882);
+    await startSocketServer({ state }); // no onFeedback
+
+    const client = createConnection({ port: 19882 });
+    await new Promise<void>((resolve, reject) => {
+      client.on("connect", resolve);
+      client.on("error", reject);
+    });
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
+
+    const msg = { timestamp: Date.now(), data: { type: "feedback", content: "any" } };
+    client.write(JSON.stringify(msg) + "\n");
+
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
+
+    // No assertion needed beyond reaching this point without throwing
+    client.destroy();
     stopSocketServer({ state });
   });
 });

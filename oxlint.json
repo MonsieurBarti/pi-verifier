@@ -25,7 +25,8 @@
     "no-useless-promise-resolve-reject": "off",
     "numeric-separators-style": "off",
     "consistent-existence-index-check": "off",
-    "capitalized-comments": "off"
+    "capitalized-comments": "off",
+    "init-declarations": "off"
   },
   "ignorePatterns": ["dist", "node_modules", "coverage"]
 }

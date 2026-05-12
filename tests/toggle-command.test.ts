@@ -9,6 +9,10 @@ const makeMockState = (): VerifierState => ({
   clients: [],
   buffer: [],
   bufferTtlMs: 30000,
+  verifierProcess: undefined,
+  pendingVerification: false,
+  lastFeedbackInjectedAt: 0,
+  feedbackCooldownMs: 5000,
 });
 
 const makeMockPi = (): ExtensionAPI =>

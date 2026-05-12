@@ -9,6 +9,7 @@ import { broadcast } from "./socket-server.js";
 
 export interface SessionCaptureDeps {
   state: VerifierState;
+  onTurnEnd?: (event: TurnEndEvent) => void;
 }
 
 export interface SessionCaptureHooks {
@@ -28,6 +29,7 @@ export function createSessionCaptureHooks(deps: SessionCaptureDeps): SessionCapt
   const turnEndHandler = (event: TurnEndEvent, _ctx: ExtensionContext): void => {
     if (state.mode === "off") return;
     broadcast(deps, { type: "turn_end", event });
+    deps.onTurnEnd?.(event);
   };
 
   const inputHandler = (event: InputEvent, _ctx: ExtensionContext): void => {

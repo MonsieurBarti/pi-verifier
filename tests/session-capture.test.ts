@@ -15,6 +15,10 @@ const makeState = (): VerifierState => ({
   clients: [],
   buffer: [],
   bufferTtlMs: 30000,
+  verifierProcess: undefined,
+  pendingVerification: false,
+  lastFeedbackInjectedAt: 0,
+  feedbackCooldownMs: 5000,
 });
 
 const makeCtx = (): ExtensionContext =>
