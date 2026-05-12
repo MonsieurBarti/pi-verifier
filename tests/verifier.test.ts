@@ -1,3 +1,4 @@
+import { fromAny } from "@total-typescript/shoehorn";
 import { describe, expect, it, vi } from "vitest";
 import { EventEmitter } from "node:events";
 
@@ -7,9 +8,9 @@ const mockInterfaces: EventEmitter[] = [];
 vi.mock("node:net", () => ({
   createConnection: vi.fn(() => {
     // eslint-disable-next-line unicorn/prefer-event-target
-    const socket = new EventEmitter() as unknown as EventEmitter & {
-      write: ReturnType<typeof vi.fn>;
-    };
+    const socket = fromAny<EventEmitter & { write: ReturnType<typeof vi.fn> }, unknown>(
+      new EventEmitter(),
+    );
     socket.write = vi.fn(() => true);
     mockSockets.push(socket);
     return socket;
@@ -107,7 +108,7 @@ describe("verifier daemon", () => {
     expect(socket.write).toHaveBeenCalled();
 
     // Check that the written data is a feedback IPC message
-    const writeCall = socket.write.mock.calls[0] as [string];
+    const writeCall = fromAny<[string], unknown>(socket.write.mock.calls[0]);
     const written = JSON.parse(writeCall[0]) as { data: { type: string; content: string } };
     expect(written.data.type).toBe("feedback");
     expect(written.data.content).toBe("Looks good to me");

@@ -1,3 +1,4 @@
+import { fromAny, fromPartial } from "@total-typescript/shoehorn";
 import { describe, expect, it, vi } from "vitest";
 import { createSessionCaptureHooks } from "../src/session-capture.js";
 import type {
@@ -26,17 +27,17 @@ const makeState = (): VerifierState => ({
 });
 
 const makeCtx = (): ExtensionContext =>
-  ({
+  fromPartial<ExtensionContext>({
     ui: { notify: vi.fn(), setStatus: vi.fn() },
     cwd: "/tmp",
-  }) as unknown as ExtensionContext;
+  });
 
 describe("session-capture", () => {
   it("should not broadcast when mode is off", () => {
     const state = makeState();
     const hooks = createSessionCaptureHooks({ state });
 
-    hooks.turnEndHandler({ some: "event" } as unknown as TurnEndEvent, makeCtx());
+    hooks.turnEndHandler(fromAny<TurnEndEvent, unknown>({ some: "event" }), makeCtx());
     expect(state.buffer.length).toBe(0);
   });
 
@@ -45,7 +46,7 @@ describe("session-capture", () => {
     state.mode = "waiting";
     const hooks = createSessionCaptureHooks({ state });
 
-    hooks.turnEndHandler({ turn: 1 } as unknown as TurnEndEvent, makeCtx());
+    hooks.turnEndHandler(fromAny<TurnEndEvent, unknown>({ turn: 1 }), makeCtx());
     expect(state.buffer.length).toBe(1);
     expect((state.buffer[0] as { data?: { type?: string } }).data?.type).toBe("turn_end");
   });
@@ -55,7 +56,10 @@ describe("session-capture", () => {
     state.mode = "waiting";
     const hooks = createSessionCaptureHooks({ state });
 
-    hooks.sessionStartHandler({ reason: "startup" } as unknown as SessionStartEvent, makeCtx());
+    hooks.sessionStartHandler(
+      fromAny<SessionStartEvent, unknown>({ reason: "startup" }),
+      makeCtx(),
+    );
     expect(state.buffer.length).toBe(1);
     expect((state.buffer[0] as { data?: { type?: string } }).data?.type).toBe("session_start");
   });
@@ -65,7 +69,7 @@ describe("session-capture", () => {
     state.mode = "waiting";
     const hooks = createSessionCaptureHooks({ state });
 
-    hooks.inputHandler({ text: "hello" } as unknown as InputEvent, makeCtx());
+    hooks.inputHandler(fromAny<InputEvent, unknown>({ text: "hello" }), makeCtx());
     expect(state.buffer.length).toBe(1);
     expect((state.buffer[0] as { data?: { type?: string } }).data?.type).toBe("input");
   });
@@ -75,7 +79,7 @@ describe("session-capture", () => {
     state.mode = "waiting";
     const onTurnEnd = vi.fn();
     const hooks = createSessionCaptureHooks({ state, onTurnEnd });
-    const event = { turn: 1 } as unknown as TurnEndEvent;
+    const event = fromAny<TurnEndEvent, unknown>({ turn: 1 });
     const ctx = makeCtx();
     hooks.turnEndHandler(event, ctx);
     expect(onTurnEnd).toHaveBeenCalledWith(event);
@@ -85,7 +89,10 @@ describe("session-capture", () => {
     const state = makeState();
     state.mode = "off";
     const hooks = createSessionCaptureHooks({ state });
-    hooks.sessionStartHandler({ reason: "startup" } as unknown as SessionStartEvent, makeCtx());
+    hooks.sessionStartHandler(
+      fromAny<SessionStartEvent, unknown>({ reason: "startup" }),
+      makeCtx(),
+    );
     expect(state.buffer.length).toBe(0);
   });
 
@@ -93,7 +100,7 @@ describe("session-capture", () => {
     const state = makeState();
     state.mode = "off";
     const hooks = createSessionCaptureHooks({ state });
-    hooks.inputHandler({ text: "hello" } as unknown as InputEvent, makeCtx());
+    hooks.inputHandler(fromAny<InputEvent, unknown>({ text: "hello" }), makeCtx());
     expect(state.buffer.length).toBe(0);
   });
 });

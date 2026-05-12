@@ -1,3 +1,4 @@
+import { fromPartial } from "@total-typescript/shoehorn";
 import { describe, it, expect } from "vitest";
 import { createReadOnlyPolicy } from "../src/read-only-policy.js";
 import type { VerifierState, ExtensionContext } from "../src/types.js";
@@ -18,14 +19,15 @@ function makeState(mode: VerifierState["mode"]): VerifierState {
     verificationAttempts: 0,
     maxVerificationAttempts: 3,
     escalationPaused: false,
-  } as unknown as VerifierState;
+    lastContext: undefined,
+  };
 }
 
 function makeEvent(toolName: string): ToolCallEvent {
-  return { type: "tool_call", toolCallId: "tc-1", toolName, input: {} } as ToolCallEvent;
+  return fromPartial<ToolCallEvent>({ type: "tool_call", toolCallId: "tc-1", toolName, input: {} });
 }
 
-const ctx = {} as ExtensionContext;
+const ctx = fromPartial<ExtensionContext>({});
 
 describe("read-only policy", () => {
   it("allows all tools when verification is off", () => {

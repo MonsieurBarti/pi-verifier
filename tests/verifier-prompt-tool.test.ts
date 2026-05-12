@@ -1,3 +1,4 @@
+import { fromPartial } from "@total-typescript/shoehorn";
 import { describe, it, expect, vi } from "vitest";
 import { createVerifierPromptTool } from "../src/verifier-prompt-tool.js";
 import type { VerifierState, ExtensionContext } from "../src/types.js";
@@ -18,10 +19,10 @@ function makeState(mode: VerifierState["mode"]): VerifierState {
     maxVerificationAttempts: 3,
     escalationPaused: false,
     lastContext: undefined,
-  } as unknown as VerifierState;
+  };
 }
 
-const ctx = { ui: { notify: vi.fn() } } as unknown as ExtensionContext;
+const ctx = fromPartial<ExtensionContext>({ ui: { notify: vi.fn() } });
 
 describe("verifier_prompt tool", () => {
   it("returns inactive message when verification is off", async () => {

@@ -1,3 +1,4 @@
+import { fromAny, fromPartial } from "@total-typescript/shoehorn";
 import { vi } from "vitest";
 import type {
   ExtensionAPI,
@@ -25,17 +26,16 @@ export const makeMockState = (overrides?: Partial<VerifierState>): VerifierState
 });
 
 export const makeMockPi = (): ExtensionAPI =>
-  ({
-    cwd: "/tmp",
+  fromPartial<ExtensionAPI>({
     exec: vi.fn(),
     on: vi.fn(),
     registerCommand: vi.fn(),
     registerTool: vi.fn(),
     sendUserMessage: vi.fn(),
-  }) as unknown as ExtensionAPI;
+  });
 
 export const makeMockCtx = (): ExtensionContext =>
-  ({
+  fromAny<ExtensionContext, unknown>({
     ui: {
       notify: vi.fn(),
       setStatus: vi.fn(),
@@ -44,16 +44,16 @@ export const makeMockCtx = (): ExtensionContext =>
       setWorkingMessage: vi.fn(),
     },
     cwd: "/tmp",
-  }) as unknown as ExtensionContext;
+  });
 
 export const makeMockCommandCtx = (): ExtensionCommandContext =>
-  ({
+  fromAny<ExtensionCommandContext, unknown>({
     ui: {
       notify: vi.fn(),
       setStatus: vi.fn(),
     },
     cwd: "/tmp",
-  }) as unknown as ExtensionCommandContext;
+  });
 
 export const makeMockEscalation = () => ({
   inputHandler: vi.fn(),

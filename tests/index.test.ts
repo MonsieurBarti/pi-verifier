@@ -1,3 +1,4 @@
+import { fromAny } from "@total-typescript/shoehorn";
 import { describe, expect, it, vi } from "vitest";
 import verifierExtension from "../src/index.js";
 import { makeMockPi, makeMockCtx, makeMockCommandCtx } from "./mocks/fixtures.js";
@@ -40,8 +41,9 @@ describe("verifierExtension entry point", () => {
     );
 
     // Clean up
-    const sessionShutdownHandler = vi.mocked(pi.on).mock.calls
-      .find((call) => call[0] === "session_shutdown")?.[1] as () => void;
+    const sessionShutdownHandler = fromAny<[string, () => void][], unknown>(
+      vi.mocked(pi.on).mock.calls,
+    ).find((call) => call[0] === "session_shutdown")?.[1];
     sessionShutdownHandler?.();
   });
 
@@ -58,9 +60,12 @@ describe("verifierExtension entry point", () => {
     const pi = makeMockPi();
     verifierExtension(pi);
 
-    const sessionStartHandlers = vi.mocked(pi.on).mock.calls
+    const sessionStartHandlers = fromAny<
+      [string, (event: unknown, ctx: unknown) => void][],
+      unknown
+    >(vi.mocked(pi.on).mock.calls)
       .filter((call) => call[0] === "session_start")
-      .map((call) => call[1] as (event: unknown, ctx: unknown) => void);
+      .map((call) => call[1]);
 
     const ctx = makeMockCtx();
     for (const handler of sessionStartHandlers) {
@@ -70,8 +75,9 @@ describe("verifierExtension entry point", () => {
     expect(ctx.ui.setStatus).toHaveBeenCalledWith("verifier", undefined);
 
     // Clean up interval by calling session_shutdown
-    const sessionShutdownHandler = vi.mocked(pi.on).mock.calls
-      .find((call) => call[0] === "session_shutdown")?.[1] as () => void;
+    const sessionShutdownHandler = fromAny<[string, () => void][], unknown>(
+      vi.mocked(pi.on).mock.calls,
+    ).find((call) => call[0] === "session_shutdown")?.[1];
     sessionShutdownHandler?.();
   });
 });

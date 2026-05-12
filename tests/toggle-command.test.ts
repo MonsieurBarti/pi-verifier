@@ -1,3 +1,4 @@
+import { fromPartial } from "@total-typescript/shoehorn";
 import { describe, expect, it, vi } from "vitest";
 import { createToggleCommand } from "../src/toggle-command.js";
 import type { ExtensionAPI, ExtensionCommandContext, VerifierState } from "../src/types.js";
@@ -20,22 +21,21 @@ const makeMockState = (): VerifierState => ({
 });
 
 const makeMockPi = (): ExtensionAPI =>
-  ({
-    cwd: "/tmp",
+  fromPartial<ExtensionAPI>({
     exec: vi.fn(),
     on: vi.fn(),
     registerCommand: vi.fn(),
     registerTool: vi.fn(),
-  }) as unknown as ExtensionAPI;
+  });
 
 const makeMockCtx = (): ExtensionCommandContext =>
-  ({
+  fromPartial<ExtensionCommandContext>({
     ui: {
       notify: vi.fn(),
       setStatus: vi.fn(),
     },
     cwd: "/tmp",
-  }) as unknown as ExtensionCommandContext;
+  });
 
 describe("toggle-command", () => {
   it("should enable verifier mode on 'on'", async () => {
@@ -69,10 +69,10 @@ describe("toggle-command", () => {
     const state = makeMockState();
     state.mode = "waiting";
     const notify = vi.fn();
-    const ctx = {
+    const ctx = fromPartial<ExtensionCommandContext>({
       ...makeMockCtx(),
       ui: { ...makeMockCtx().ui, notify },
-    } as unknown as ExtensionCommandContext;
+    });
     const cmd = createToggleCommand({
       state,
       pi: makeMockPi(),
@@ -89,10 +89,10 @@ describe("toggle-command", () => {
   it("should show usage for invalid args", async () => {
     const state = makeMockState();
     const notify = vi.fn();
-    const ctx = {
+    const ctx = fromPartial<ExtensionCommandContext>({
       ...makeMockCtx(),
       ui: { ...makeMockCtx().ui, notify },
-    } as unknown as ExtensionCommandContext;
+    });
     const cmd = createToggleCommand({
       state,
       pi: makeMockPi(),
@@ -110,10 +110,10 @@ describe("toggle-command", () => {
     state.escalationPaused = true;
     const onResume = vi.fn();
     const notify = vi.fn();
-    const ctx = {
+    const ctx = fromPartial<ExtensionCommandContext>({
       ...makeMockCtx(),
       ui: { ...makeMockCtx().ui, notify },
-    } as unknown as ExtensionCommandContext;
+    });
     const cmd = createToggleCommand({
       state,
       pi: makeMockPi(),
@@ -133,10 +133,10 @@ describe("toggle-command", () => {
     state.escalationPaused = false;
     const onResume = vi.fn();
     const notify = vi.fn();
-    const ctx = {
+    const ctx = fromPartial<ExtensionCommandContext>({
       ...makeMockCtx(),
       ui: { ...makeMockCtx().ui, notify },
-    } as unknown as ExtensionCommandContext;
+    });
     const cmd = createToggleCommand({
       state,
       pi: makeMockPi(),
@@ -155,10 +155,10 @@ describe("toggle-command", () => {
     const state = makeMockState();
     state.mode = "off";
     const notify = vi.fn();
-    const ctx = {
+    const ctx = fromPartial<ExtensionCommandContext>({
       ...makeMockCtx(),
       ui: { ...makeMockCtx().ui, notify },
-    } as unknown as ExtensionCommandContext;
+    });
     const cmd = createToggleCommand({
       state,
       pi: makeMockPi(),

@@ -1,6 +1,7 @@
+import { fromPartial } from "@total-typescript/shoehorn";
 import { describe, it, expect, vi } from "vitest";
 import { createEscalationController } from "../src/escalation.js";
-import type { VerifierState, ExtensionContext } from "../src/types.js";
+import type { ExtensionAPI, VerifierState, ExtensionContext } from "../src/types.js";
 
 function makeState(): VerifierState {
   return {
@@ -18,18 +19,27 @@ function makeState(): VerifierState {
     maxVerificationAttempts: 3,
     escalationPaused: false,
     lastContext: undefined,
-  } as unknown as VerifierState;
+  };
 }
 
 function makeCtx(): ExtensionContext {
-  return { ui: { notify: vi.fn() } } as unknown as ExtensionContext;
+  return fromPartial<ExtensionContext>({ ui: { notify: vi.fn() } });
 }
+
+const makeMockPi = (): ExtensionAPI =>
+  fromPartial<ExtensionAPI>({
+    exec: vi.fn(),
+    on: vi.fn(),
+    registerCommand: vi.fn(),
+    registerTool: vi.fn(),
+    sendUserMessage: vi.fn(),
+  });
 
 describe("escalation", () => {
   it("resets attempts on input", () => {
     const state = makeState();
     state.verificationAttempts = 2;
-    const { inputHandler } = createEscalationController({ state, pi: {} as any });
+    const { inputHandler } = createEscalationController({ state, pi: makeMockPi() });
     inputHandler({ type: "input", text: "hello", source: "interactive" }, makeCtx());
     expect(state.verificationAttempts).toBe(0);
   });
@@ -37,7 +47,7 @@ describe("escalation", () => {
   it("pauses after max attempts and notifies user", () => {
     const state = makeState();
     const ctx = makeCtx();
-    const { incrementAttempts } = createEscalationController({ state, pi: {} as any });
+    const { incrementAttempts } = createEscalationController({ state, pi: makeMockPi() });
     incrementAttempts(ctx);
     incrementAttempts(ctx);
     incrementAttempts(ctx);
@@ -49,7 +59,7 @@ describe("escalation", () => {
     const state = makeState();
     state.escalationPaused = true;
     const ctx = makeCtx();
-    const { checkEscalation } = createEscalationController({ state, pi: {} as any });
+    const { checkEscalation } = createEscalationController({ state, pi: makeMockPi() });
     expect(checkEscalation(ctx)).toBe(true);
     expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("paused"), "warning");
   });
@@ -58,7 +68,7 @@ describe("escalation", () => {
     const state = makeState();
     state.escalationPaused = true;
     state.verificationAttempts = 3;
-    const { resume } = createEscalationController({ state, pi: {} as any });
+    const { resume } = createEscalationController({ state, pi: makeMockPi() });
     resume();
     expect(state.escalationPaused).toBe(false);
     expect(state.verificationAttempts).toBe(0);
@@ -68,7 +78,7 @@ describe("escalation", () => {
     const state = makeState();
     state.escalationPaused = false;
     const ctx = makeCtx();
-    const { checkEscalation } = createEscalationController({ state, pi: {} as any });
+    const { checkEscalation } = createEscalationController({ state, pi: makeMockPi() });
     expect(checkEscalation(ctx)).toBe(false);
     expect(ctx.ui.notify).not.toHaveBeenCalled();
   });

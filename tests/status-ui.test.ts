@@ -3,7 +3,7 @@ import { createStatusUI } from "../src/status-ui.js";
 import type { VerifierState } from "../src/types.js";
 
 function makeState(overrides: Partial<VerifierState> = {}): VerifierState {
-  return {
+  const base: VerifierState = {
     mode: "off",
     port: 9876,
     server: undefined,
@@ -17,8 +17,9 @@ function makeState(overrides: Partial<VerifierState> = {}): VerifierState {
     verificationAttempts: 0,
     maxVerificationAttempts: 3,
     escalationPaused: false,
-    ...overrides,
-  } as unknown as VerifierState;
+    lastContext: undefined,
+  };
+  return Object.assign(base, overrides);
 }
 
 const ui = createStatusUI();

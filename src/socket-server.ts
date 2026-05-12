@@ -1,5 +1,5 @@
 import { createServer } from "node:net";
-import type { FeedbackPayload, VerifierState } from "./types.js";
+import { isFeedbackPayload, type FeedbackPayload, type VerifierState } from "./types.js";
 
 export interface SocketServerDeps {
   state: VerifierState;
@@ -22,22 +22,27 @@ export function startSocketServer(deps: SocketServerDeps): Promise<void> {
       }
       state.buffer = []; // Clear buffer after flush
 
+      function handleInboundLine(line: string): void {
+        if (!line.trim()) return;
+        try {
+          const parsed = JSON.parse(line);
+          if (typeof parsed === "object" && parsed !== null && "data" in parsed) {
+            const data = Reflect.get(parsed, "data");
+            if (isFeedbackPayload(data)) {
+              deps.onFeedback?.(data);
+            }
+          }
+        } catch {
+          // ignore malformed JSON lines
+        }
+      }
+
       socket.on("data", (chunk) => {
         inboundBuffer += chunk.toString();
         const lines = inboundBuffer.split("\n");
         inboundBuffer = lines.pop() ?? "";
         for (const line of lines) {
-          if (line.trim()) {
-            try {
-              const parsed = JSON.parse(line) as { data?: unknown };
-              const payload = parsed.data as FeedbackPayload | undefined;
-              if (payload && payload.type === "feedback") {
-                deps.onFeedback?.(payload);
-              }
-            } catch {
-              // ignore malformed JSON lines
-            }
-          }
+          handleInboundLine(line);
         }
       });
 
@@ -85,8 +90,12 @@ export function broadcast(deps: SocketServerDeps, data: unknown): void {
     state.buffer.push(msg);
     const cutoff = Date.now() - state.bufferTtlMs;
     state.buffer = state.buffer.filter((m) => {
-      const ts = (m as { timestamp?: number }).timestamp ?? 0;
-      return ts > cutoff;
+      if (typeof m !== "object" || m === null) return false;
+      const ts = Reflect.get(m, "timestamp");
+      if (typeof ts === "number") {
+        return ts > cutoff;
+      }
+      return false;
     });
   }
 }

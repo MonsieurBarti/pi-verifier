@@ -2,7 +2,13 @@ import { createConnection } from "node:net";
 import { createInterface } from "node:readline";
 import { createAgentSession, type AgentSession } from "@earendil-works/pi-coding-agent";
 import { loadPersona, loadPrompt } from "./prompt-loader.js";
-import type { IpcMessage, IpcPayload, TurnEndEvent } from "./types.js";
+import {
+  isAssistantMessage,
+  isIpcMessage,
+  type IpcMessage,
+  type IpcPayload,
+  type TurnEndEvent,
+} from "./types.js";
 
 const PORT = 9876;
 const HOST = "127.0.0.1";
@@ -14,8 +20,10 @@ let session: AgentSession | undefined;
 
 rl.on("line", (line) => {
   try {
-    const msg = JSON.parse(line) as IpcMessage;
-    handleMessage(msg.data);
+    const parsed = JSON.parse(line);
+    if (isIpcMessage(parsed)) {
+      handleMessage(parsed.data);
+    }
   } catch {
     // ignore malformed lines
   }
@@ -42,8 +50,11 @@ async function initSession(): Promise<void> {
 
 try {
   await initSession();
-} catch (error) {
-  console.error("[verifier] Failed to create session:", error);
+} catch (error: unknown) {
+  console.error(
+    "[verifier] Failed to create session:",
+    error instanceof Error ? error.message : String(error),
+  );
   process.exit(1);
 }
 
@@ -94,11 +105,9 @@ function runVerificationPrompt(agentSession: AgentSession, promptText: string): 
 }
 
 function extractAssistantText(msg: unknown): string | undefined {
-  if (!msg || typeof msg !== "object") return undefined;
-  const m = msg as { role?: string; content?: { type: string; text?: string }[] };
-  if (m.role !== "assistant") return undefined;
-  return m.content
-    ?.filter((c) => c.type === "text")
+  if (!isAssistantMessage(msg)) return undefined;
+  return msg.content
+    .filter((c) => c.type === "text")
     .map((c) => c.text)
     .join("\n");
 }

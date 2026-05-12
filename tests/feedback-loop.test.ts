@@ -1,3 +1,4 @@
+import { fromAny, fromPartial } from "@total-typescript/shoehorn";
 import { describe, expect, it, vi } from "vitest";
 import { createFeedbackLoop } from "../src/feedback-loop.js";
 import type { ExtensionAPI, TurnEndEvent, VerifierState } from "../src/types.js";
@@ -21,11 +22,11 @@ const makeState = (overrides?: Partial<VerifierState>): VerifierState => ({
 });
 
 const makePi = (): ExtensionAPI =>
-  ({
+  fromPartial<ExtensionAPI>({
     sendUserMessage: vi.fn(),
     on: vi.fn(),
     registerCommand: vi.fn(),
-  }) as unknown as ExtensionAPI;
+  });
 
 const makeEscalation = () => ({
   inputHandler: vi.fn(),
@@ -41,7 +42,7 @@ describe("feedback-loop", () => {
     const escalation = makeEscalation();
     const loop = createFeedbackLoop({ state, pi, escalation });
 
-    loop.turnEndHandler({} as unknown as TurnEndEvent);
+    loop.turnEndHandler(fromAny<TurnEndEvent, unknown>({}));
     expect(state.pendingVerification).toBe(false);
   });
 
@@ -51,7 +52,7 @@ describe("feedback-loop", () => {
     const escalation = makeEscalation();
     const loop = createFeedbackLoop({ state, pi, escalation });
 
-    loop.turnEndHandler({} as unknown as TurnEndEvent);
+    loop.turnEndHandler(fromAny<TurnEndEvent, unknown>({}));
     expect(state.pendingVerification).toBe(true);
   });
 
@@ -66,7 +67,7 @@ describe("feedback-loop", () => {
     const escalation = makeEscalation();
     const loop = createFeedbackLoop({ state, pi, escalation });
 
-    loop.turnEndHandler({} as unknown as TurnEndEvent);
+    loop.turnEndHandler(fromAny<TurnEndEvent, unknown>({}));
     expect(state.pendingVerification).toBe(false);
   });
 
@@ -81,7 +82,7 @@ describe("feedback-loop", () => {
     const escalation = makeEscalation();
     const loop = createFeedbackLoop({ state, pi, escalation });
 
-    loop.turnEndHandler({} as unknown as TurnEndEvent);
+    loop.turnEndHandler(fromAny<TurnEndEvent, unknown>({}));
     expect(state.pendingVerification).toBe(true);
   });
 
