@@ -84,21 +84,21 @@ Use the verifier_prompt tool to double-check my recent refactor (reason: "check 
 
 ### Components
 
-| Module | Responsibility |
-|--------|---------------|
-| `index.ts` | Extension entry point — wires all modules, registers commands/tools, manages lifecycle |
-| `toggle-command.ts` | `/verify on\|off\|resume` command with state machine |
-| `socket-server.ts` | TCP loopback server — broadcasts session events, buffers until verifier connects |
-| `session-capture.ts` | Builder-side hooks (`session_start`, `turn_end`, `input`) — captures and forwards events |
-| `verifier-spawn.ts` | Spawns verifier subagent process, monitors lifecycle |
-| `verifier.ts` | Verifier daemon — TCP client, read-only `AgentSession`, analysis loop |
-| `feedback-loop.ts` | Receives verifier feedback, injects as follow-up message with cooldown/loop detection |
-| `escalation.ts` | Loop counter — pauses after 3 consecutive feedback injections, supports `/verify resume` |
-| `read-only-policy.ts` | Builder-side tool interceptor — blocks `write`/`edit`/`bash` when verification is active |
-| `verifier-prompt-tool.ts` | `verifier_prompt` custom tool for on-demand verification |
-| `status-ui.ts` | Footer status, ASCII widget, spinner indicator |
-| `prompt-loader.ts` | Markdown prompt loader with `{{variable}}` substitution |
-| `types.ts` | Shared TypeScript types, SDK re-exports, and runtime type guards |
+| Module                    | Responsibility                                                                           |
+| ------------------------- | ---------------------------------------------------------------------------------------- |
+| `index.ts`                | Extension entry point — wires all modules, registers commands/tools, manages lifecycle   |
+| `toggle-command.ts`       | `/verify on\|off\|resume` command with state machine                                     |
+| `socket-server.ts`        | TCP loopback server — broadcasts session events, buffers until verifier connects         |
+| `session-capture.ts`      | Builder-side hooks (`session_start`, `turn_end`, `input`) — captures and forwards events |
+| `verifier-spawn.ts`       | Spawns verifier subagent process, monitors lifecycle                                     |
+| `verifier.ts`             | Verifier daemon — TCP client, read-only `AgentSession`, analysis loop                    |
+| `feedback-loop.ts`        | Receives verifier feedback, injects as follow-up message with cooldown/loop detection    |
+| `escalation.ts`           | Loop counter — pauses after 3 consecutive feedback injections, supports `/verify resume` |
+| `read-only-policy.ts`     | Builder-side tool interceptor — blocks `write`/`edit`/`bash` when verification is active |
+| `verifier-prompt-tool.ts` | `verifier_prompt` custom tool for on-demand verification                                 |
+| `status-ui.ts`            | Footer status, ASCII widget, spinner indicator                                           |
+| `prompt-loader.ts`        | Markdown prompt loader with `{{variable}}` substitution                                  |
+| `types.ts`                | Shared TypeScript types, SDK re-exports, and runtime type guards                         |
 
 ### IPC Protocol
 
@@ -109,21 +109,21 @@ Builder and verifier communicate over **TCP loopback** (127.0.0.1) using **JSON 
 {"timestamp": 1715523456790, "data": {"type": "feedback", "content": "Looks good to me"}}
 ```
 
-| Type | Direction | Description |
-|------|-----------|-------------|
-| `session_start` | Builder → Verifier | Session initialized |
-| `turn_end` | Builder → Verifier | Builder completed a turn |
-| `input` | Builder → Verifier | User input received |
-| `feedback` | Verifier → Builder | Analysis result to inject |
+| Type            | Direction          | Description               |
+| --------------- | ------------------ | ------------------------- |
+| `session_start` | Builder → Verifier | Session initialized       |
+| `turn_end`      | Builder → Verifier | Builder completed a turn  |
+| `input`         | Builder → Verifier | User input received       |
+| `feedback`      | Verifier → Builder | Analysis result to inject |
 
 ## ⚙️ Configuration
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Port | `9876` | TCP loopback port for builder↔verifier IPC |
-| Feedback cooldown | `5000ms` | Minimum ms between feedback injections |
-| Max verification attempts | `3` | Consecutive feedbacks before escalation pause |
-| Buffer TTL | `30000ms` | How long to retain buffered messages |
+| Setting                   | Default   | Description                                   |
+| ------------------------- | --------- | --------------------------------------------- |
+| Port                      | `9876`    | TCP loopback port for builder↔verifier IPC    |
+| Feedback cooldown         | `5000ms`  | Minimum ms between feedback injections        |
+| Max verification attempts | `3`       | Consecutive feedbacks before escalation pause |
+| Buffer TTL                | `30000ms` | How long to retain buffered messages          |
 
 ## 🧪 Development
 
@@ -140,7 +140,9 @@ pnpm run build
 ## 🪶 Status
 
 <!-- x-release-please-start-version -->
+
 v0.0.1
+
 <!-- x-release-please-end -->
 
 PI extension shipped with 13 modules, 16 test files (81 tests), and full test coverage above thresholds. The verifier subagent runs as an isolated Node.js process with read-only tool access, analyzing every builder turn via the PI coding agent SDK.
