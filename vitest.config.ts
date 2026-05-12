@@ -9,6 +9,8 @@ export default defineConfig({
         "tests/**/*.spec.ts",
         "tests/**/*.test.ts",
         "tests/fixtures/**",
+        "tests/mocks/**",
+        "src/types.ts",
         "**/*.d.ts",
         "vitest.config.ts",
       ],

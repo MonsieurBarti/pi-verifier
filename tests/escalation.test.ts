@@ -63,4 +63,13 @@ describe("escalation", () => {
     expect(state.escalationPaused).toBe(false);
     expect(state.verificationAttempts).toBe(0);
   });
+
+  it("checkEscalation returns false when not paused", () => {
+    const state = makeState();
+    state.escalationPaused = false;
+    const ctx = makeCtx();
+    const { checkEscalation } = createEscalationController({ state, pi: {} as any });
+    expect(checkEscalation(ctx)).toBe(false);
+    expect(ctx.ui.notify).not.toHaveBeenCalled();
+  });
 });

@@ -150,4 +150,25 @@ describe("toggle-command", () => {
     expect(onResume).not.toHaveBeenCalled();
     expect(notify).toHaveBeenCalledWith(expect.stringContaining("not paused"), "info");
   });
+
+  it("should warn when disabling already-disabled mode", async () => {
+    const state = makeMockState();
+    state.mode = "off";
+    const notify = vi.fn();
+    const ctx = {
+      ...makeMockCtx(),
+      ui: { ...makeMockCtx().ui, notify },
+    } as unknown as ExtensionCommandContext;
+    const cmd = createToggleCommand({
+      state,
+      pi: makeMockPi(),
+      onEnable: vi.fn(),
+      onDisable: vi.fn(),
+    });
+
+    await cmd.handler("off", ctx);
+
+    expect(notify).toHaveBeenCalledWith(expect.stringContaining("Already disabled"), "warning");
+    expect(state.mode).toBe("off");
+  });
 });

@@ -59,4 +59,12 @@ describe("status-ui", () => {
       ui.formatWorkingMessage(makeState({ mode: "active", pendingVerification: true })),
     ).toContain("analyzing");
   });
+
+  it("shows waiting status when waiting", () => {
+    expect(ui.formatStatus(makeState({ mode: "waiting" }))).toContain("waiting");
+  });
+
+  it("shows active status when active and no flags", () => {
+    expect(ui.formatStatus(makeState({ mode: "active" }))).toContain("active");
+  });
 });

@@ -69,4 +69,31 @@ describe("session-capture", () => {
     expect(state.buffer.length).toBe(1);
     expect((state.buffer[0] as { data?: { type?: string } }).data?.type).toBe("input");
   });
+
+  it("should call onTurnEnd callback when provided", () => {
+    const state = makeState();
+    state.mode = "waiting";
+    const onTurnEnd = vi.fn();
+    const hooks = createSessionCaptureHooks({ state, onTurnEnd });
+    const event = { turn: 1 } as unknown as TurnEndEvent;
+    const ctx = makeCtx();
+    hooks.turnEndHandler(event, ctx);
+    expect(onTurnEnd).toHaveBeenCalledWith(event);
+  });
+
+  it("should not broadcast session_start when mode is off", () => {
+    const state = makeState();
+    state.mode = "off";
+    const hooks = createSessionCaptureHooks({ state });
+    hooks.sessionStartHandler({ reason: "startup" } as unknown as SessionStartEvent, makeCtx());
+    expect(state.buffer.length).toBe(0);
+  });
+
+  it("should not broadcast input when mode is off", () => {
+    const state = makeState();
+    state.mode = "off";
+    const hooks = createSessionCaptureHooks({ state });
+    hooks.inputHandler({ text: "hello" } as unknown as InputEvent, makeCtx());
+    expect(state.buffer.length).toBe(0);
+  });
 });
