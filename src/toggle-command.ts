@@ -6,6 +6,8 @@ export interface ToggleCommandDeps {
   onEnable: () => void | Promise<void>;
   onDisable: () => void | Promise<void>;
   onResume?: () => void;
+  onReport?: (ctx: ExtensionCommandContext) => void;
+  onLaunch?: (ctx: ExtensionCommandContext) => void;
 }
 
 export interface ToggleCommand {
@@ -19,7 +21,8 @@ export function createToggleCommand(deps: ToggleCommandDeps): ToggleCommand {
 
   return {
     name: "verify",
-    description: "Toggle verifier mode: /verify on | /verify off | /verify resume",
+    description:
+      "Toggle verifier mode: /verify on | /verify off | /verify resume | /verify report | /verify launch",
     async handler(args: string, ctx: ExtensionCommandContext): Promise<void> {
       const arg = args.trim().toLowerCase();
 
@@ -29,6 +32,8 @@ export function createToggleCommand(deps: ToggleCommandDeps): ToggleCommand {
           return;
         }
         state.mode = "waiting";
+        state.verifierSessionId =
+          (ctx.sessionManager?.getSessionId() as string | undefined) ?? "unknown";
         await onEnable();
         ctx.ui.notify(
           "[pi-verifier] Verifier mode enabled. Waiting for verifier connection...",
@@ -58,7 +63,31 @@ export function createToggleCommand(deps: ToggleCommandDeps): ToggleCommand {
         return;
       }
 
-      ctx.ui.notify("[pi-verifier] Usage: /verify on | /verify off | /verify resume", "info");
+      if (arg === "report") {
+        if (state.mode === "off") {
+          ctx.ui.notify("[pi-verifier] No active session to report on.", "warning");
+          return;
+        }
+        deps.onReport?.(ctx);
+        return;
+      }
+
+      if (arg === "launch") {
+        if (state.mode === "off") {
+          ctx.ui.notify(
+            "[pi-verifier] Verifier is not running. Enable it first with /verify on",
+            "warning",
+          );
+          return;
+        }
+        deps.onLaunch?.(ctx);
+        return;
+      }
+
+      ctx.ui.notify(
+        "[pi-verifier] Usage: /verify on | /verify off | /verify resume | /verify report | /verify launch",
+        "info",
+      );
     },
   };
 }

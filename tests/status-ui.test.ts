@@ -21,18 +21,39 @@ describe("status-ui", () => {
     );
   });
 
-  it("returns widget content when active", () => {
+  it("returns compact widget when active", () => {
     const widget = ui.formatWidget(makeMockState({ mode: "active", verificationAttempts: 2 }));
     expect(widget).toBeDefined();
-    expect(widget!.join("\n")).toContain("Attempts:  2");
+    expect(widget![0]).toContain("● active");
+    expect(widget![0]).toContain("Attempts: 2/3");
   });
 
-  it("returns working indicator when analyzing", () => {
+  it("returns compact widget when escalated", () => {
+    const widget = ui.formatWidget(
+      makeMockState({ mode: "active", escalationPaused: true, verificationAttempts: 3 }),
+    );
+    expect(widget).toBeDefined();
+    expect(widget![0]).toContain("⏸️ paused");
+    expect(widget![0]).toContain("Attempts: 3/3");
+    expect(widget![1]).toContain("Escalated");
+  });
+
+  it("returns compact widget when analyzing", () => {
+    const widget = ui.formatWidget(
+      makeMockState({ mode: "active", pendingVerification: true, verificationAttempts: 1 }),
+    );
+    expect(widget).toBeDefined();
+    expect(widget![0]).toContain("⏳ analyzing");
+    expect(widget![1]).toContain("Analyzing");
+  });
+
+  it("returns Braille working indicator when analyzing", () => {
     const indicator = ui.formatWorkingIndicator(
       makeMockState({ mode: "active", pendingVerification: true }),
     );
     expect(indicator).toBeDefined();
-    expect(indicator!.frames).toEqual(["◐", "◓", "◑", "◒"]);
+    expect(indicator!.frames).toEqual(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]);
+    expect(indicator!.intervalMs).toBe(80);
   });
 
   it("returns working message when analyzing", () => {

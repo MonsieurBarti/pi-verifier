@@ -138,4 +138,81 @@ describe("toggle-command", () => {
     expect(notify).toHaveBeenCalledWith(expect.stringContaining("Already disabled"), "warning");
     expect(state.mode).toBe("off");
   });
+
+  it("/verify report calls onReport when enabled", async () => {
+    const onReport = vi.fn();
+    const deps = {
+      state: makeMockState({ mode: "active" }),
+      pi: makeMockPi(),
+      onEnable: vi.fn(),
+      onDisable: vi.fn(),
+      onResume: vi.fn(),
+      onReport,
+    };
+    const cmd = createToggleCommand(deps);
+    const ctx = makeMockCommandCtx();
+    await cmd.handler("report", ctx);
+    expect(onReport).toHaveBeenCalledWith(ctx);
+  });
+
+  it("/verify report warns when disabled", async () => {
+    const state = makeMockState({ mode: "off" });
+    const notify = vi.fn();
+    const ctx = fromPartial<ExtensionCommandContext>({
+      ...makeMockCommandCtx(),
+      ui: { ...makeMockCommandCtx().ui, notify },
+    });
+    const cmd = createToggleCommand({
+      state,
+      pi: makeMockPi(),
+      onEnable: vi.fn(),
+      onDisable: vi.fn(),
+      onResume: vi.fn(),
+      onReport: vi.fn(),
+    });
+
+    await cmd.handler("report", ctx);
+
+    expect(notify).toHaveBeenCalledWith(expect.stringContaining("No active session"), "warning");
+  });
+
+  it("/verify launch calls onLaunch when enabled", async () => {
+    const onLaunch = vi.fn();
+    const deps = {
+      state: makeMockState({ mode: "active" }),
+      pi: makeMockPi(),
+      onEnable: vi.fn(),
+      onDisable: vi.fn(),
+      onResume: vi.fn(),
+      onReport: vi.fn(),
+      onLaunch,
+    };
+    const cmd = createToggleCommand(deps);
+    const ctx = makeMockCommandCtx();
+    await cmd.handler("launch", ctx);
+    expect(onLaunch).toHaveBeenCalledWith(ctx);
+  });
+
+  it("/verify launch warns when disabled", async () => {
+    const state = makeMockState({ mode: "off" });
+    const notify = vi.fn();
+    const ctx = fromPartial<ExtensionCommandContext>({
+      ...makeMockCommandCtx(),
+      ui: { ...makeMockCommandCtx().ui, notify },
+    });
+    const cmd = createToggleCommand({
+      state,
+      pi: makeMockPi(),
+      onEnable: vi.fn(),
+      onDisable: vi.fn(),
+      onResume: vi.fn(),
+      onReport: vi.fn(),
+      onLaunch: vi.fn(),
+    });
+
+    await cmd.handler("launch", ctx);
+
+    expect(notify).toHaveBeenCalledWith(expect.stringContaining("not running"), "warning");
+    expect(notify).toHaveBeenCalledWith(expect.stringContaining("/verify on"), "warning");
+  });
 });

@@ -11,22 +11,31 @@ export interface StatusUI {
 
 function formatStatus(state: VerifierState): string | undefined {
   if (state.mode === "off") return undefined;
-  if (state.escalationPaused) return "🔍 Verifier: paused (escalated)";
-  if (state.pendingVerification) return "🔍 Verifier: analyzing…";
-  if (state.mode === "waiting") return "🔍 Verifier: waiting";
-  return "🔍 Verifier: active";
+  if (state.escalationPaused) return "🔍 Verifier: ⏸️ paused (escalated)";
+  if (state.pendingVerification) return "🔍 Verifier: ⏳ analyzing…";
+  if (state.mode === "waiting") return "🔍 Verifier: ⏳ waiting for connection";
+  return "🔍 Verifier: ● active";
 }
 
 function formatWidget(state: VerifierState): string[] | undefined {
   if (state.mode === "off") return undefined;
-  const lines = [
-    `┌─ Verifier ───────────────────────┐`,
-    `│ Mode:      ${state.mode.padEnd(20)} │`,
-    `│ Attempts:  ${String(state.verificationAttempts).padEnd(20)} │`,
-    `│ Max:       ${String(state.maxVerificationAttempts).padEnd(20)} │`,
-    `│ Escalated: ${String(state.escalationPaused).padEnd(20)} │`,
-    `└──────────────────────────────────┘`,
-  ];
+
+  const statusEmoji = state.escalationPaused ? "⏸️" : state.pendingVerification ? "⏳" : "●";
+  const statusText = state.escalationPaused
+    ? "paused"
+    : state.pendingVerification
+      ? "analyzing"
+      : state.mode;
+  const attempts = `${state.verificationAttempts}/${state.maxVerificationAttempts}`;
+
+  const lines = [`🔍 Verifier  ${statusEmoji} ${statusText}  |  Attempts: ${attempts}`];
+
+  if (state.escalationPaused) {
+    lines.push(`   ⏸️  Escalated — run /verify resume to continue`);
+  } else if (state.pendingVerification) {
+    lines.push(`   ⏳  Analyzing the last turn…`);
+  }
+
   return lines;
 }
 
@@ -35,8 +44,8 @@ function formatWorkingIndicator(
 ): { frames: string[]; intervalMs: number } | undefined {
   if (state.mode !== "active" || !state.pendingVerification) return undefined;
   return {
-    frames: ["◐", "◓", "◑", "◒"],
-    intervalMs: 250,
+    frames: ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
+    intervalMs: 80,
   };
 }
 

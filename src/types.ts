@@ -37,14 +37,25 @@ export type VerifierMode = (typeof MODES)[keyof typeof MODES];
 export interface VerifierState {
   mode: VerifierMode;
   port: number;
+  portRetries: number;
+  maxRestarts: number;
+  restartDelayMs: number;
+  restartCount: number;
+  dangerousTools: Set<string>;
+  allowedTools: Set<string>;
+  toolPolicyMode: "block" | "allow";
+  sessionHistory: TurnEndEvent[];
   server: Server | undefined;
   clients: Socket[];
   buffer: { timestamp: number; data: unknown }[];
   bufferTtlMs: number;
   verifierProcess: ChildProcess | undefined;
+  verifierSessionId: string | undefined;
   pendingVerification: boolean;
   lastFeedbackInjectedAt: number;
   feedbackCooldownMs: number;
+  /** Number of turn_end events to skip because they were caused by our own feedback injection. */
+  skipTurnEndCount: number;
   verificationAttempts: number;
   maxVerificationAttempts: number;
   escalationPaused: boolean;
@@ -70,7 +81,8 @@ export type IpcPayload =
   | { type: "session_start" }
   | { type: "turn_end"; event: TurnEndEvent }
   | { type: "input"; event: InputEvent }
-  | { type: "feedback"; content: string };
+  | { type: "feedback"; content: string }
+  | { type: "analysis_error"; error: string };
 
 export interface FeedbackPayload {
   type: "feedback";

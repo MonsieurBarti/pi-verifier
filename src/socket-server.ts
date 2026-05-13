@@ -12,11 +12,13 @@ export interface SocketServerDeps {
   onFeedback?: (payload: FeedbackPayload) => void;
 }
 
-export function startSocketServer(deps: SocketServerDeps): Promise<void> {
+export function startSocketServer(deps: SocketServerDeps, preferredPort?: number): Promise<void> {
   const { state } = deps;
   if (state.server) return Promise.resolve(); // Already running
 
-  return new Promise((resolve) => {
+  const port = preferredPort ?? state.port;
+
+  return new Promise((resolve, reject) => {
     const server = createServer((socket) => {
       state.clients.push(socket);
       state.mode = "active";
@@ -58,11 +60,44 @@ export function startSocketServer(deps: SocketServerDeps): Promise<void> {
       });
     });
 
-    server.listen(state.port, () => {
+    const onError = (err: Error) => {
+      server.off("error", onError);
+      reject(err);
+    };
+    server.once("error", onError);
+
+    server.listen(port, () => {
+      server.off("error", onError);
       state.server = server;
+      state.port = port;
       resolve();
     });
   });
+}
+
+export async function startSocketServerWithFallback(deps: SocketServerDeps): Promise<void> {
+  const { state } = deps;
+  if (state.server) return;
+
+  let port = state.port;
+  let retries = state.portRetries;
+
+  while (retries >= 0) {
+    try {
+      // oxlint-disable-next-line no-await-in-loop
+      await startSocketServer(deps, port);
+      return;
+    } catch (error) {
+      if (retries === 0) {
+        throw new Error(
+          `Could not bind to any port in range ${state.port}-${port}. Last error: ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error },
+        );
+      }
+      port++;
+      retries--;
+    }
+  }
 }
 
 export function stopSocketServer(deps: SocketServerDeps): void {

@@ -2,28 +2,33 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { startVerifier, stopVerifier } from "../src/verifier-spawn.js";
 import { makeMockState } from "./mocks/fixtures.js";
 
-const mockProcs: {
-  listeners: Record<string, ((...args: unknown[]) => void)[]>;
-  kill: ReturnType<typeof vi.fn>;
-}[] = [];
+let nextExecFileError: Error | undefined;
 
 vi.mock("node:child_process", () => ({
-  spawn: vi.fn((_command: string, _args: string[], _options: Record<string, unknown>) => {
-    const listeners: Record<string, ((...args: unknown[]) => void)[]> = {};
-    const on = (event: string, cb: (...args: unknown[]) => void): void => {
-      if (!listeners[event]) listeners[event] = [];
-      listeners[event].push(cb);
-    };
-    const kill = vi.fn();
-    const proc = {
-      stdout: { on: (_event: string, _cb: (data: Buffer) => void): void => {} },
-      stderr: { on: (_event: string, _cb: (data: Buffer) => void): void => {} },
-      on,
-      kill,
-    };
-    mockProcs.push({ listeners, kill });
-    return proc;
+  execFile: vi.fn(
+    (
+      _cmd: string,
+      _args: string[],
+      cb: (error: Error | undefined, result: { stdout: string }) => void,
+    ) => {
+      cb(nextExecFileError, { stdout: "" });
+    },
+  ),
+}));
+
+let accessShouldFail = false;
+
+vi.mock("node:fs/promises", () => ({
+  access: vi.fn(() => {
+    if (accessShouldFail) return Promise.reject(new Error("ENOENT"));
+    return Promise.resolve();
   }),
+  writeFile: vi.fn(() => Promise.resolve()),
+  readFile: vi.fn(() => Promise.resolve("")),
+}));
+
+vi.mock("node:os", () => ({
+  tmpdir: vi.fn(() => "/tmp"),
 }));
 
 vi.mock("node:path", () => ({
@@ -31,56 +36,133 @@ vi.mock("node:path", () => ({
 }));
 
 beforeEach(() => {
-  mockProcs.length = 0;
+  nextExecFileError = undefined;
+  accessShouldFail = false;
 });
 
-describe("verifier-spawn", () => {
-  it("should set verifierProcess on start", () => {
-    const state = makeMockState();
-    expect(state.verifierProcess).toBeUndefined();
-    startVerifier({ state });
-    expect(state.verifierProcess).toBeDefined();
-    expect(mockProcs.length).toBe(1);
+describe("verifier-spawn with launcher", () => {
+  it("launches verifier terminal", async () => {
+    const notifySpy = vi.fn();
+    const state = makeMockState({
+      verifierSessionId: "test-session",
+      lastContext: {
+        sessionManager: { getSessionId: () => "test-session" },
+        ui: {
+          notify: notifySpy,
+          setStatus: vi.fn(),
+          setWidget: vi.fn(),
+          setWorkingIndicator: vi.fn(),
+          setWorkingMessage: vi.fn(),
+        },
+        cwd: "/tmp",
+      },
+    });
+
+    await startVerifier({ state });
+
+    expect(notifySpy).toHaveBeenCalledWith(
+      expect.stringContaining("Verifier launched in tmux session"),
+      "info",
+    );
   });
 
-  it("should be a no-op when already running", () => {
-    const state = makeMockState();
-    startVerifier({ state });
-    const [firstProc] = mockProcs;
-    startVerifier({ state });
-    expect(mockProcs.length).toBe(1);
-    expect(mockProcs[0]).toBe(firstProc);
+  it("warns when no session ID is set", async () => {
+    const notifySpy = vi.fn();
+    const state = makeMockState({
+      verifierSessionId: undefined,
+      lastContext: {
+        ui: {
+          notify: notifySpy,
+          setStatus: vi.fn(),
+          setWidget: vi.fn(),
+          setWorkingIndicator: vi.fn(),
+          setWorkingMessage: vi.fn(),
+        },
+        cwd: "/tmp",
+      },
+    });
+
+    await startVerifier({ state });
+
+    expect(notifySpy).toHaveBeenCalledWith(expect.stringContaining("No session ID"), "warning");
   });
 
-  it("should kill the process and clear state", () => {
-    const state = makeMockState({ mode: "active" });
-    startVerifier({ state });
-    expect(state.verifierProcess).toBeDefined();
+  it("kills verifier terminal on stop and clears session ID", async () => {
+    const state = makeMockState({
+      verifierSessionId: "test-session",
+      lastContext: {
+        sessionManager: { getSessionId: () => "test-session" },
+        ui: {
+          notify: vi.fn(),
+          setStatus: vi.fn(),
+          setWidget: vi.fn(),
+          setWorkingIndicator: vi.fn(),
+          setWorkingMessage: vi.fn(),
+        },
+        cwd: "/tmp",
+      },
+    });
+
     stopVerifier({ state });
-    expect(mockProcs[0]!.kill).toHaveBeenCalledWith("SIGTERM");
-    expect(state.verifierProcess).toBeUndefined();
+
+    await new Promise((r) => {
+      setTimeout(r, 10);
+    });
+
+    expect(state.verifierSessionId).toBeUndefined();
   });
 
-  it("should update state to waiting on process exit", () => {
-    const state = makeMockState({ mode: "active" });
-    startVerifier({ state });
-    const { listeners } = mockProcs[0]!;
-    const exitListeners = listeners["exit"];
-    expect(exitListeners).toBeDefined();
-    expect(exitListeners!.length).toBeGreaterThan(0);
-    exitListeners![0]!(0);
-    expect(state.verifierProcess).toBeUndefined();
+  it("notifies error when launch fails", async () => {
+    const notifySpy = vi.fn();
+    const state = makeMockState({
+      mode: "active",
+      verifierSessionId: "test-session",
+      lastContext: {
+        sessionManager: { getSessionId: () => "test-session" },
+        ui: {
+          notify: notifySpy,
+          setStatus: vi.fn(),
+          setWidget: vi.fn(),
+          setWorkingIndicator: vi.fn(),
+          setWorkingMessage: vi.fn(),
+        },
+        cwd: "/tmp",
+      },
+    });
+
+    nextExecFileError = new Error("tmux not found");
+    await startVerifier({ state });
+
+    expect(notifySpy).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to launch verifier"),
+      "error",
+    );
     expect(state.mode).toBe("waiting");
   });
 
-  it("should keep mode as off when process exits while mode is off", () => {
-    const state = makeMockState({ mode: "off" });
-    startVerifier({ state });
-    const { listeners } = mockProcs[0]!;
-    const exitListeners = listeners["exit"];
-    expect(exitListeners).toBeDefined();
-    exitListeners![0]!(1);
-    expect(state.verifierProcess).toBeUndefined();
-    expect(state.mode).toBe("off");
+  it("notifies error when verifier script is not found in any candidate path", async () => {
+    const notifySpy = vi.fn();
+    const state = makeMockState({
+      verifierSessionId: "test-session",
+      lastContext: {
+        sessionManager: { getSessionId: () => "test-session" },
+        ui: {
+          notify: notifySpy,
+          setStatus: vi.fn(),
+          setWidget: vi.fn(),
+          setWorkingIndicator: vi.fn(),
+          setWorkingMessage: vi.fn(),
+        },
+        cwd: "/tmp",
+      },
+    });
+
+    accessShouldFail = true;
+    await startVerifier({ state });
+
+    expect(notifySpy).toHaveBeenCalledWith(
+      expect.stringContaining("Verifier script not found"),
+      "error",
+    );
   });
 });

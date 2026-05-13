@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { createConnection } from "node:net";
-import { startSocketServer, stopSocketServer, broadcast } from "../src/socket-server.js";
+import {
+  startSocketServer,
+  startSocketServerWithFallback,
+  stopSocketServer,
+  broadcast,
+} from "../src/socket-server.js";
 import { makeMockState } from "./mocks/fixtures.js";
 
 describe("socket-server", () => {
@@ -129,5 +134,31 @@ describe("socket-server", () => {
     // No assertion needed beyond reaching this point without throwing
     client.destroy();
     stopSocketServer({ state });
+  });
+
+  it("falls back to next port when preferred port is taken", async () => {
+    const firstState = makeMockState({ port: 19990 });
+    await startSocketServer({ state: firstState });
+
+    const secondState = makeMockState({ port: 19990, portRetries: 3 });
+    await startSocketServerWithFallback({ state: secondState });
+
+    expect(secondState.port).toBe(19991);
+    expect(secondState.server).toBeDefined();
+
+    stopSocketServer({ state: firstState });
+    stopSocketServer({ state: secondState });
+  });
+
+  it("throws when all ports in range are taken", async () => {
+    const firstState = makeMockState({ port: 19995 });
+    await startSocketServer({ state: firstState });
+
+    const secondState = makeMockState({ port: 19995, portRetries: 0 });
+    await expect(startSocketServerWithFallback({ state: secondState })).rejects.toThrow(
+      "Could not bind to any port in range",
+    );
+
+    stopSocketServer({ state: firstState });
   });
 });

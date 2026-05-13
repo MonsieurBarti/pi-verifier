@@ -2,10 +2,9 @@
 
 ## [0.0.3](https://github.com/MonsieurBarti/pi-verifier/compare/pi-verifier-v0.0.2...pi-verifier-v0.0.3) (2026-05-12)
 
-
 ### Bug Fixes
 
-* trigger release after publish auth fix ([61d488f](https://github.com/MonsieurBarti/pi-verifier/commit/61d488f0f25c0266b9eb52eaf84ab42a07a42fd8))
+- trigger release after publish auth fix ([61d488f](https://github.com/MonsieurBarti/pi-verifier/commit/61d488f0f25c0266b9eb52eaf84ab42a07a42fd8))
 
 ## [0.0.2](https://github.com/MonsieurBarti/pi-verifier/compare/pi-verifier-v0.0.1...pi-verifier-v0.0.2) (2026-05-12)
 
