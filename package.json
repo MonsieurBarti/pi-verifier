@@ -1,6 +1,6 @@
 {
   "name": "@the-forge-flow/pi-verifier",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "PI extension that runs a verifier subagent to observe and correct builder sessions",
   "keywords": [
     "extension",
