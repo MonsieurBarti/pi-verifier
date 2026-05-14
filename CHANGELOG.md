@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.6](https://github.com/MonsieurBarti/pi-verifier/compare/pi-verifier-v0.0.5...pi-verifier-v0.0.6) (2026-05-14)
+
+
+### Features
+
+* adopt Disler-style lifecycle gating for verifier ([f2f3407](https://github.com/MonsieurBarti/pi-verifier/commit/f2f340723426b54e3d6519c975df3c07def4c70c))
+* adopt Disler-style lifecycle gating for verifier ([ecd9d54](https://github.com/MonsieurBarti/pi-verifier/commit/ecd9d54fc04411bf457b9859e77ad7b758b2b15b))
+
 ## [0.0.5](https://github.com/MonsieurBarti/pi-verifier/compare/pi-verifier-v0.0.4...pi-verifier-v0.0.5) (2026-05-13)
 
 ### Bug Fixes
