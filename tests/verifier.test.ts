@@ -81,7 +81,7 @@ describe("verifier daemon", () => {
     });
   });
 
-  it("should handle turn_end and send feedback", async () => {
+  it("should handle start+stop and send feedback", async () => {
     await waitForVerifierInit();
     const rl = mockInterfaces[0]!;
     const socket = mockSockets[0]!;
@@ -89,16 +89,23 @@ describe("verifier daemon", () => {
     expect(rl).toBeDefined();
     expect(socket).toBeDefined();
 
-    // Simulate receiving a turn_end message from builder
-    const turnEndMsg = JSON.stringify({
+    // Start event must precede stop
+    const startMsg = JSON.stringify({
+      timestamp: Date.now(),
+      data: { type: "start", turnIndex: 1 },
+    });
+    rl.emit("line", startMsg);
+
+    // Stop event
+    const stopMsg = JSON.stringify({
       timestamp: Date.now(),
       data: {
-        type: "turn_end",
+        type: "stop",
+        turnIndex: 1,
         event: { message: { role: "assistant", content: "test" }, toolResults: [] },
       },
     });
-
-    rl.emit("line", turnEndMsg);
+    rl.emit("line", stopMsg);
 
     // Wait for async prompt and feedback
     await new Promise<void>((resolve) => {
@@ -125,11 +132,38 @@ describe("verifier daemon", () => {
     expect(socket.write.mock.calls.length).toBe(writeCallsBefore);
   });
 
-  it("accumulates session history across turns", async () => {
+  it("verifies injected turns too (regression detection)", async () => {
+    await waitForVerifierInit();
+    const rl = mockInterfaces[0]!;
+    const socket = mockSockets[0]!;
+
+    const { createAgentSession } = await import("@earendil-works/pi-coding-agent");
+    const mockedFn = vi.mocked(createAgentSession);
+    const { session } = await mockedFn.mock.results[0]!.value;
+
+    const promptCallsBefore = vi.mocked(session.prompt).mock.calls.length;
+
+    // Stop without start = injected corrective turn → still verified (Option B)
+    const stopMsg = JSON.stringify({
+      timestamp: Date.now(),
+      data: {
+        type: "stop",
+        turnIndex: 1,
+        event: { message: { role: "assistant", content: "fix applied" }, toolResults: [] },
+      },
+    });
+    rl.emit("line", stopMsg);
+    await new Promise<void>((r) => setTimeout(() => r(), 10));
+
+    // Prompt SHOULD have been triggered — we verify injected turns too
+    expect(vi.mocked(session.prompt).mock.calls.length).toBe(promptCallsBefore + 1);
+    expect(socket.write.mock.calls.length).toBeGreaterThan(0);
+  });
+
+  it("accumulates session history across genuine turns", async () => {
     await waitForVerifierInit();
     const rl = mockInterfaces[0]!;
 
-    // Access the mock session to inspect prompt calls
     const { createAgentSession } = await import("@earendil-works/pi-coding-agent");
     const mockedFn = vi.mocked(createAgentSession);
     const { session } = await mockedFn.mock.results[0]!.value;
@@ -144,32 +178,46 @@ describe("verifier daemon", () => {
 
     const callsBefore = vi.mocked(session.prompt).mock.calls.length;
 
-    // First turn
-    const turnEndMsg1 = JSON.stringify({
-      timestamp: Date.now(),
-      data: {
-        type: "turn_end",
-        event: { message: { role: "assistant", content: "turn 1" }, toolResults: [] },
-      },
-    });
-    rl.emit("line", turnEndMsg1);
+    // First genuine turn
+    rl.emit(
+      "line",
+      JSON.stringify({ timestamp: Date.now(), data: { type: "start", turnIndex: 1 } }),
+    );
+    rl.emit(
+      "line",
+      JSON.stringify({
+        timestamp: Date.now(),
+        data: {
+          type: "stop",
+          turnIndex: 1,
+          event: { message: { role: "assistant", content: "turn 1" }, toolResults: [] },
+        },
+      }),
+    );
     await new Promise<void>((r) => setTimeout(() => r(), 10));
 
-    // Second turn
-    const turnEndMsg2 = JSON.stringify({
-      timestamp: Date.now(),
-      data: {
-        type: "turn_end",
-        event: { message: { role: "assistant", content: "turn 2" }, toolResults: [] },
-      },
-    });
-    rl.emit("line", turnEndMsg2);
+    // Second genuine turn
+    rl.emit(
+      "line",
+      JSON.stringify({ timestamp: Date.now(), data: { type: "start", turnIndex: 2 } }),
+    );
+    rl.emit(
+      "line",
+      JSON.stringify({
+        timestamp: Date.now(),
+        data: {
+          type: "stop",
+          turnIndex: 2,
+          event: { message: { role: "assistant", content: "turn 2" }, toolResults: [] },
+        },
+      }),
+    );
     await new Promise<void>((r) => setTimeout(() => r(), 10));
 
     const promptCalls = vi.mocked(session.prompt).mock.calls.slice(callsBefore);
     expect(promptCalls.length).toBe(2);
     expect(promptCalls[0]![0]).not.toContain("Session history");
-    expect(promptCalls[1]![0]).toContain("Session history (1 prior turn)");
+    expect(promptCalls[1]![0]).toContain("Session history (1 prior turn");
   });
 
   it("clears session history on session_start", async () => {
@@ -190,15 +238,22 @@ describe("verifier daemon", () => {
 
     const callsBefore = vi.mocked(session.prompt).mock.calls.length;
 
-    // First turn to build history
-    const turnEndMsg1 = JSON.stringify({
-      timestamp: Date.now(),
-      data: {
-        type: "turn_end",
-        event: { message: { role: "assistant", content: "turn 1" }, toolResults: [] },
-      },
-    });
-    rl.emit("line", turnEndMsg1);
+    // First genuine turn to build history
+    rl.emit(
+      "line",
+      JSON.stringify({ timestamp: Date.now(), data: { type: "start", turnIndex: 1 } }),
+    );
+    rl.emit(
+      "line",
+      JSON.stringify({
+        timestamp: Date.now(),
+        data: {
+          type: "stop",
+          turnIndex: 1,
+          event: { message: { role: "assistant", content: "turn 1" }, toolResults: [] },
+        },
+      }),
+    );
     await new Promise<void>((r) => setTimeout(() => r(), 10));
 
     // Session start clears history
@@ -210,14 +265,21 @@ describe("verifier daemon", () => {
     await new Promise<void>((r) => setTimeout(() => r(), 10));
 
     // Next turn should have no history
-    const turnEndMsg2 = JSON.stringify({
-      timestamp: Date.now(),
-      data: {
-        type: "turn_end",
-        event: { message: { role: "assistant", content: "turn 2" }, toolResults: [] },
-      },
-    });
-    rl.emit("line", turnEndMsg2);
+    rl.emit(
+      "line",
+      JSON.stringify({ timestamp: Date.now(), data: { type: "start", turnIndex: 2 } }),
+    );
+    rl.emit(
+      "line",
+      JSON.stringify({
+        timestamp: Date.now(),
+        data: {
+          type: "stop",
+          turnIndex: 2,
+          event: { message: { role: "assistant", content: "turn 2" }, toolResults: [] },
+        },
+      }),
+    );
     await new Promise<void>((r) => setTimeout(() => r(), 10));
 
     const promptCalls = vi.mocked(session.prompt).mock.calls.slice(callsBefore);
@@ -226,7 +288,7 @@ describe("verifier daemon", () => {
     expect(promptCalls[1]![0]).not.toContain("Session history");
   });
 
-  it("accumulates recent inputs and includes them in analysis prompt", async () => {
+  it("accumulates recent user prompts from start events", async () => {
     await waitForVerifierInit();
     const rl = mockInterfaces[0]!;
 
@@ -244,39 +306,44 @@ describe("verifier daemon", () => {
 
     const callsBefore = vi.mocked(session.prompt).mock.calls.length;
 
-    // Send two input events
-    const inputMsg1 = JSON.stringify({
-      timestamp: Date.now(),
-      data: { type: "input", event: { text: "build a feature" } },
-    });
-    rl.emit("line", inputMsg1);
+    // Send two start events with user prompts
+    rl.emit(
+      "line",
+      JSON.stringify({
+        timestamp: Date.now(),
+        data: { type: "start", turnIndex: 1, userPrompt: "build a feature" },
+      }),
+    );
+    rl.emit(
+      "line",
+      JSON.stringify({
+        timestamp: Date.now(),
+        data: { type: "start", turnIndex: 2, userPrompt: "use TypeScript" },
+      }),
+    );
 
-    const inputMsg2 = JSON.stringify({
-      timestamp: Date.now(),
-      data: { type: "input", event: { text: "use TypeScript" } },
-    });
-    rl.emit("line", inputMsg2);
-    await new Promise<void>((r) => setTimeout(() => r(), 10));
-
-    // Turn end should include recent inputs
-    const turnEndMsg = JSON.stringify({
-      timestamp: Date.now(),
-      data: {
-        type: "turn_end",
-        event: { message: { role: "assistant", content: "done" }, toolResults: [] },
-      },
-    });
-    rl.emit("line", turnEndMsg);
+    // Stop for turn 2
+    rl.emit(
+      "line",
+      JSON.stringify({
+        timestamp: Date.now(),
+        data: {
+          type: "stop",
+          turnIndex: 2,
+          event: { message: { role: "assistant", content: "done" }, toolResults: [] },
+        },
+      }),
+    );
     await new Promise<void>((r) => setTimeout(() => r(), 10));
 
     const promptCalls = vi.mocked(session.prompt).mock.calls.slice(callsBefore);
     expect(promptCalls.length).toBe(1);
-    expect(promptCalls[0]![0]).toContain("Recent user inputs (2)");
+    expect(promptCalls[0]![0]).toContain("Recent user prompts (2)");
     expect(promptCalls[0]![0]).toContain("build a feature");
     expect(promptCalls[0]![0]).toContain("use TypeScript");
   });
 
-  it("clears recent inputs on session_start", async () => {
+  it("clears recent prompts on session_start", async () => {
     await waitForVerifierInit();
     const rl = mockInterfaces[0]!;
 
@@ -294,14 +361,16 @@ describe("verifier daemon", () => {
 
     const callsBefore = vi.mocked(session.prompt).mock.calls.length;
 
-    // Send an input
-    const inputMsg = JSON.stringify({
-      timestamp: Date.now(),
-      data: { type: "input", event: { text: "some command" } },
-    });
-    rl.emit("line", inputMsg);
+    // Start with a prompt
+    rl.emit(
+      "line",
+      JSON.stringify({
+        timestamp: Date.now(),
+        data: { type: "start", turnIndex: 1, userPrompt: "some command" },
+      }),
+    );
 
-    // Session start clears inputs
+    // Session start clears prompts
     const sessionStartMsg2 = JSON.stringify({
       timestamp: Date.now(),
       data: { type: "session_start" },
@@ -309,23 +378,30 @@ describe("verifier daemon", () => {
     rl.emit("line", sessionStartMsg2);
     await new Promise<void>((r) => setTimeout(() => r(), 10));
 
-    // Turn end should have no recent inputs
-    const turnEndMsg = JSON.stringify({
-      timestamp: Date.now(),
-      data: {
-        type: "turn_end",
-        event: { message: { role: "assistant", content: "ok" }, toolResults: [] },
-      },
-    });
-    rl.emit("line", turnEndMsg);
+    // Stop should have no recent prompts
+    rl.emit(
+      "line",
+      JSON.stringify({ timestamp: Date.now(), data: { type: "start", turnIndex: 2 } }),
+    );
+    rl.emit(
+      "line",
+      JSON.stringify({
+        timestamp: Date.now(),
+        data: {
+          type: "stop",
+          turnIndex: 2,
+          event: { message: { role: "assistant", content: "ok" }, toolResults: [] },
+        },
+      }),
+    );
     await new Promise<void>((r) => setTimeout(() => r(), 10));
 
     const promptCalls = vi.mocked(session.prompt).mock.calls.slice(callsBefore);
     expect(promptCalls.length).toBe(1);
-    expect(promptCalls[0]![0]).not.toContain("Recent user inputs");
+    expect(promptCalls[0]![0]).not.toContain("Recent user prompts");
   });
 
-  it("limits recent inputs to 5", async () => {
+  it("limits recent prompts to 5", async () => {
     await waitForVerifierInit();
     const rl = mockInterfaces[0]!;
 
@@ -343,89 +419,38 @@ describe("verifier daemon", () => {
 
     const callsBefore = vi.mocked(session.prompt).mock.calls.length;
 
-    // Send 6 inputs
+    // Send 6 start events
     for (let i = 1; i <= 6; i++) {
-      const inputMsg = JSON.stringify({
-        timestamp: Date.now(),
-        data: { type: "input", event: { text: `input ${i}` } },
-      });
-      rl.emit("line", inputMsg);
+      rl.emit(
+        "line",
+        JSON.stringify({
+          timestamp: Date.now(),
+          data: { type: "start", turnIndex: i, userPrompt: `prompt ${i}` },
+        }),
+      );
     }
     await new Promise<void>((r) => setTimeout(() => r(), 10));
 
-    // Turn end should only have 5 most recent inputs
-    const turnEndMsg = JSON.stringify({
-      timestamp: Date.now(),
-      data: {
-        type: "turn_end",
-        event: { message: { role: "assistant", content: "done" }, toolResults: [] },
-      },
-    });
-    rl.emit("line", turnEndMsg);
+    // Stop for turn 6
+    rl.emit(
+      "line",
+      JSON.stringify({
+        timestamp: Date.now(),
+        data: {
+          type: "stop",
+          turnIndex: 6,
+          event: { message: { role: "assistant", content: "done" }, toolResults: [] },
+        },
+      }),
+    );
     await new Promise<void>((r) => setTimeout(() => r(), 10));
 
     const promptCalls = vi.mocked(session.prompt).mock.calls.slice(callsBefore);
     expect(promptCalls.length).toBe(1);
-    expect(promptCalls[0]![0]).toContain("Recent user inputs (5)");
-    expect(promptCalls[0]![0]).not.toContain("input 1");
-    expect(promptCalls[0]![0]).toContain("input 2");
-    expect(promptCalls[0]![0]).toContain("input 6");
-  });
-
-  it("ignores empty or whitespace-only input events", async () => {
-    await waitForVerifierInit();
-    const rl = mockInterfaces[0]!;
-
-    const { createAgentSession } = await import("@earendil-works/pi-coding-agent");
-    const mockedFn = vi.mocked(createAgentSession);
-    const { session } = await mockedFn.mock.results[0]!.value;
-
-    // Clear state from prior tests
-    const sessionStartMsg = JSON.stringify({
-      timestamp: Date.now(),
-      data: { type: "session_start" },
-    });
-    rl.emit("line", sessionStartMsg);
-    await new Promise<void>((r) => setTimeout(() => r(), 10));
-
-    const callsBefore = vi.mocked(session.prompt).mock.calls.length;
-
-    // Send empty and whitespace inputs
-    const emptyInput = JSON.stringify({
-      timestamp: Date.now(),
-      data: { type: "input", event: { text: "" } },
-    });
-    rl.emit("line", emptyInput);
-
-    const wsInput = JSON.stringify({
-      timestamp: Date.now(),
-      data: { type: "input", event: { text: "   " } },
-    });
-    rl.emit("line", wsInput);
-
-    // Send one valid input
-    const validInput = JSON.stringify({
-      timestamp: Date.now(),
-      data: { type: "input", event: { text: "valid" } },
-    });
-    rl.emit("line", validInput);
-    await new Promise<void>((r) => setTimeout(() => r(), 10));
-
-    const turnEndMsg = JSON.stringify({
-      timestamp: Date.now(),
-      data: {
-        type: "turn_end",
-        event: { message: { role: "assistant", content: "ok" }, toolResults: [] },
-      },
-    });
-    rl.emit("line", turnEndMsg);
-    await new Promise<void>((r) => setTimeout(() => r(), 10));
-
-    const promptCalls = vi.mocked(session.prompt).mock.calls.slice(callsBefore);
-    expect(promptCalls.length).toBe(1);
-    expect(promptCalls[0]![0]).toContain("Recent user inputs (1)");
-    expect(promptCalls[0]![0]).toContain("valid");
-    expect(promptCalls[0]![0]).not.toContain("input 0"); // no empty text
+    expect(promptCalls[0]![0]).toContain("Recent user prompts (5)");
+    expect(promptCalls[0]![0]).not.toContain("prompt 1");
+    expect(promptCalls[0]![0]).toContain("prompt 2");
+    expect(promptCalls[0]![0]).toContain("prompt 6");
   });
 
   it("sends error feedback when analysis fails", async () => {
@@ -453,14 +478,19 @@ describe("verifier daemon", () => {
     rl.emit("line", sessionStartMsg);
     await new Promise<void>((r) => setTimeout(() => r(), 10));
 
-    const turnEndMsg = JSON.stringify({
+    rl.emit(
+      "line",
+      JSON.stringify({ timestamp: Date.now(), data: { type: "start", turnIndex: 1 } }),
+    );
+    const stopMsg = JSON.stringify({
       timestamp: Date.now(),
       data: {
-        type: "turn_end",
+        type: "stop",
+        turnIndex: 1,
         event: { message: { role: "assistant", content: "test" }, toolResults: [] },
       },
     });
-    rl.emit("line", turnEndMsg);
+    rl.emit("line", stopMsg);
     await new Promise<void>((r) => setTimeout(() => r(), 10));
 
     expect(socket.write).toHaveBeenCalled();

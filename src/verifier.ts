@@ -4,6 +4,16 @@
 // This module is spawned as a child process by verifier-spawn.ts. It runs
 // independently with its own AgentSession and communicates with the builder
 // over TCP loopback via JSON Lines.
+//
+// Lifecycle alignment with the builder (Disler-style):
+//   - The builder broadcasts a "start" event before each genuine user turn.
+//   - The builder broadcasts a "stop" event after EVERY turn_end (genuine and
+//     injected corrective turns).
+//   - We verify ALL stop events. Injected corrective turns are verified too;
+//     this catches regressions introduced by fixes.
+//   - Loop protection lives on the builder side: verificationAttempts only
+//     resets on genuine user turns. After maxVerificationAttempts, escalation
+//     pauses further feedback injection.
 // ---------------------------------------------------------------------------
 
 import { createConnection } from "node:net";
@@ -13,6 +23,8 @@ import { loadPersona, loadPrompt } from "./prompt-loader.js";
 import {
   isAssistantMessage,
   isIpcMessage,
+  isStartPayload,
+  isStopPayload,
   toJsonl,
   type IpcMessage,
   type IpcPayload,
@@ -25,8 +37,8 @@ const HOST = "127.0.0.1";
 const sessionHistory: TurnEndEvent[] = [];
 const MAX_HISTORY = 10;
 
-const recentInputs: string[] = [];
-const MAX_INPUTS = 5;
+const recentUserPrompts: string[] = [];
+const MAX_PROMPTS = 5;
 
 const client = createConnection({ port: PORT, host: HOST });
 const rl = createInterface({ input: client });
@@ -79,18 +91,26 @@ try {
   process.exit(1);
 }
 
-async function handleTurnEnd(event: TurnEndEvent): Promise<void> {
+async function handleTurnEnd(
+  event: TurnEndEvent,
+  turnIndex: number,
+  userPrompt?: string,
+): Promise<void> {
   if (!session || isAnalyzing) return;
 
   isAnalyzing = true;
   try {
-    await doHandleTurnEnd(event);
+    await doHandleTurnEnd(event, turnIndex, userPrompt);
   } finally {
     isAnalyzing = false;
   }
 }
 
-async function doHandleTurnEnd(event: TurnEndEvent): Promise<void> {
+async function doHandleTurnEnd(
+  event: TurnEndEvent,
+  turnIndex: number,
+  userPrompt?: string,
+): Promise<void> {
   if (!session) return;
 
   sessionHistory.push(event);
@@ -118,12 +138,12 @@ async function doHandleTurnEnd(event: TurnEndEvent): Promise<void> {
           .join("\n")}`
       : "";
 
-  const inputContext =
-    recentInputs.length > 0
-      ? `\n\nRecent user inputs (${recentInputs.length}):\n${recentInputs.map((text, i) => `Input ${i + 1}: ${JSON.stringify(text).slice(0, 150)}`).join("\n")}`
+  const promptHistoryContext =
+    recentUserPrompts.length > 0
+      ? `\n\nRecent user prompts (${recentUserPrompts.length}):\n${recentUserPrompts.map((text, i) => `Prompt ${i + 1}: ${JSON.stringify(text).slice(0, 150)}`).join("\n")}`
       : "";
 
-  const promptText = `${persona}\n\nAnalyze the following builder turn:\n\nTurn content: ${JSON.stringify(event.message)}\nTool results: ${JSON.stringify(event.toolResults)}\n${errorContext}${historyContext}${inputContext}\n\nProvide concise feedback (1-3 sentences) or "LGTM".\n\n${stopTemplate}`;
+  const promptText = `${persona}\n\nAnalyze the following builder turn (turn ${turnIndex}${userPrompt ? ` — "${userPrompt.slice(0, 80)}"` : ""}):\n\nTurn content: ${JSON.stringify(event.message)}\nTool results: ${JSON.stringify(event.toolResults)}\n${errorContext}${historyContext}${promptHistoryContext}\n\nProvide concise feedback (1-3 sentences) or "LGTM".\n\n${stopTemplate}`;
 
   try {
     const feedback = await runVerificationPrompt(session, promptText);
@@ -176,25 +196,33 @@ function extractAssistantText(msg: unknown): string | undefined {
 
 function handleMessage(data: IpcPayload): void {
   switch (data.type) {
-    case "turn_end": {
-      handleTurnEnd(data.event).catch((error) => {
-        console.error("[verifier] Analysis error:", error);
-      });
+    case "start": {
+      if (isStartPayload(data)) {
+        if (data.userPrompt) {
+          recentUserPrompts.push(data.userPrompt);
+          if (recentUserPrompts.length > MAX_PROMPTS) {
+            recentUserPrompts.shift();
+          }
+        }
+      }
+      break;
+    }
+    case "stop": {
+      if (isStopPayload(data)) {
+        handleTurnEnd(data.event, data.turnIndex, data.userPrompt).catch((error) => {
+          console.error("[verifier] Analysis error:", error);
+        });
+      }
       break;
     }
     case "session_start": {
       sessionHistory.length = 0;
-      recentInputs.length = 0;
+      recentUserPrompts.length = 0;
       break;
     }
-    case "input": {
-      const text = data.event.text?.trim();
-      if (text) {
-        recentInputs.push(text);
-        if (recentInputs.length > MAX_INPUTS) {
-          recentInputs.shift();
-        }
-      }
+    case "error": {
+      // eslint-disable-next-line no-console
+      console.error("[verifier] Builder error:", data.detail);
       break;
     }
   }

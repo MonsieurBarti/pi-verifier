@@ -2,11 +2,10 @@
 
 ## [0.0.5](https://github.com/MonsieurBarti/pi-verifier/compare/pi-verifier-v0.0.4...pi-verifier-v0.0.5) (2026-05-13)
 
-
 ### Bug Fixes
 
-* **build:** copy persona and prompts assets to dist ([4f0e8d8](https://github.com/MonsieurBarti/pi-verifier/commit/4f0e8d8b52c1400f337faf9245ee0a17827b9305))
-* **build:** copy persona and prompts assets to dist/ ([93e45aa](https://github.com/MonsieurBarti/pi-verifier/commit/93e45aa4e4e6d736562f0269004ec0f21cbbccd0))
+- **build:** copy persona and prompts assets to dist ([4f0e8d8](https://github.com/MonsieurBarti/pi-verifier/commit/4f0e8d8b52c1400f337faf9245ee0a17827b9305))
+- **build:** copy persona and prompts assets to dist/ ([93e45aa](https://github.com/MonsieurBarti/pi-verifier/commit/93e45aa4e4e6d736562f0269004ec0f21cbbccd0))
 
 ## [0.0.4](https://github.com/MonsieurBarti/pi-verifier/compare/pi-verifier-v0.0.3...pi-verifier-v0.0.4) (2026-05-13)
 

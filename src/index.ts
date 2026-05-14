@@ -42,7 +42,6 @@ export default function verifierExtension(
     dangerousTools: new Set(options?.dangerousTools ?? ["write", "edit", "bash"]),
     allowedTools: new Set(options?.allowedTools ?? ["read", "grep", "find", "ls"]),
     toolPolicyMode: options?.toolPolicyMode ?? "block",
-    sessionHistory: [],
     server: undefined,
     clients: [],
     buffer: [],
@@ -52,11 +51,15 @@ export default function verifierExtension(
     pendingVerification: false,
     lastFeedbackInjectedAt: 0,
     feedbackCooldownMs: options?.feedbackCooldownMs ?? 5000,
-    skipTurnEndCount: 0,
     verificationAttempts: 0,
     maxVerificationAttempts: options?.maxVerificationAttempts ?? 3,
     escalationPaused: false,
     lastContext: undefined,
+    injectedNext: false,
+    turnIndex: 0,
+    lastUserPrompt: undefined,
+    sessionFilePath: undefined,
+    currentTurnGenuine: false,
   };
 
   const escalation = createEscalationController({ state, pi });
@@ -116,9 +119,9 @@ export default function verifierExtension(
 
   const hooks = createSessionCaptureHooks({ state, onTurnEnd: feedbackLoop.turnEndHandler });
   pi.on("session_start", hooks.sessionStartHandler);
+  pi.on("before_agent_start", hooks.beforeAgentStartHandler);
   pi.on("turn_end", hooks.turnEndHandler);
   pi.on("input", hooks.inputHandler);
-  pi.on("input", escalation.inputHandler);
   pi.on("tool_call", readOnlyPolicy.toolCallHandler);
 
   // Enhanced status updates

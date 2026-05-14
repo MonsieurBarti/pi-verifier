@@ -3,13 +3,6 @@ import { createEscalationController } from "../src/escalation.js";
 import { makeMockState, makeMockCtx, makeMockPi } from "./mocks/fixtures.js";
 
 describe("escalation", () => {
-  it("resets attempts on input", () => {
-    const state = makeMockState({ mode: "active", verificationAttempts: 2 });
-    const { inputHandler } = createEscalationController({ state, pi: makeMockPi() });
-    inputHandler({ type: "input", text: "hello", source: "interactive" }, makeMockCtx());
-    expect(state.verificationAttempts).toBe(0);
-  });
-
   it("pauses after max attempts and notifies user", () => {
     const state = makeMockState({ mode: "active" });
     const ctx = makeMockCtx();

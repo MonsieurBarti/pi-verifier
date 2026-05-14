@@ -17,7 +17,6 @@ export const makeMockState = (overrides?: Partial<VerifierState>): VerifierState
   dangerousTools: new Set(["write", "edit", "bash"]),
   allowedTools: new Set(["read", "grep", "find", "ls"]),
   toolPolicyMode: "block",
-  sessionHistory: [],
   server: undefined,
   clients: [],
   buffer: [],
@@ -27,11 +26,15 @@ export const makeMockState = (overrides?: Partial<VerifierState>): VerifierState
   pendingVerification: false,
   lastFeedbackInjectedAt: 0,
   feedbackCooldownMs: 5000,
-  skipTurnEndCount: 0,
   verificationAttempts: 0,
   maxVerificationAttempts: 3,
   escalationPaused: false,
   lastContext: undefined,
+  injectedNext: false,
+  turnIndex: 0,
+  lastUserPrompt: undefined,
+  sessionFilePath: undefined,
+  currentTurnGenuine: false,
   ...overrides,
 });
 
@@ -55,6 +58,7 @@ export const makeMockCtx = (): ExtensionContext =>
     },
     sessionManager: {
       getSessionId: vi.fn(() => "mock-session"),
+      getSessionFile: vi.fn(() => "/tmp/mock-session.jsonl"),
     },
     cwd: "/tmp",
   });
@@ -69,7 +73,6 @@ export const makeMockCommandCtx = (): ExtensionCommandContext =>
   });
 
 export const makeMockEscalation = () => ({
-  inputHandler: vi.fn(),
   checkEscalation: vi.fn(() => false),
   incrementAttempts: vi.fn(),
   resume: vi.fn(),

@@ -47,10 +47,11 @@ describe("verifierExtension entry point", () => {
     sessionShutdownHandler?.();
   });
 
-  it("should register session hooks", () => {
+  it("should register session lifecycle hooks", () => {
     const pi = makeMockPi();
     verifierExtension(pi);
     expect(pi.on).toHaveBeenCalledWith("session_start", expect.any(Function));
+    expect(pi.on).toHaveBeenCalledWith("before_agent_start", expect.any(Function));
     expect(pi.on).toHaveBeenCalledWith("turn_end", expect.any(Function));
     expect(pi.on).toHaveBeenCalledWith("input", expect.any(Function));
     expect(pi.on).toHaveBeenCalledWith("tool_call", expect.any(Function));

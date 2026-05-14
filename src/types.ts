@@ -9,6 +9,9 @@ import type {
   TurnEndEvent,
   SessionStartEvent,
   InputEvent,
+  BeforeAgentStartEvent,
+  AgentEndEvent,
+  InputSource,
 } from "@earendil-works/pi-coding-agent";
 
 export type {
@@ -20,6 +23,9 @@ export type {
   TurnEndEvent,
   SessionStartEvent,
   InputEvent,
+  BeforeAgentStartEvent,
+  AgentEndEvent,
+  InputSource,
 };
 
 // ---------------------------------------------------------------------------
@@ -44,7 +50,6 @@ export interface VerifierState {
   dangerousTools: Set<string>;
   allowedTools: Set<string>;
   toolPolicyMode: "block" | "allow";
-  sessionHistory: TurnEndEvent[];
   server: Server | undefined;
   clients: Socket[];
   buffer: { timestamp: number; data: unknown }[];
@@ -54,16 +59,24 @@ export interface VerifierState {
   pendingVerification: boolean;
   lastFeedbackInjectedAt: number;
   feedbackCooldownMs: number;
-  /** Number of turn_end events to skip because they were caused by our own feedback injection. */
-  skipTurnEndCount: number;
   verificationAttempts: number;
   maxVerificationAttempts: number;
   escalationPaused: boolean;
   lastContext: ExtensionContext | undefined;
+  /** True when the next before_agent_start is from our own pi.sendUserMessage injection. */
+  injectedNext: boolean;
+  /** Monotonic turn counter incremented only for genuine user prompts. */
+  turnIndex: number;
+  /** The last non-extension user prompt text. */
+  lastUserPrompt: string | undefined;
+  /** Path to the builder's session JSONL file. */
+  sessionFilePath: string | undefined;
+  /** Whether the current turn is a genuine user turn (true) or injected feedback (false). */
+  currentTurnGenuine: boolean;
 }
 
 export interface SessionEvent {
-  type: "turn_end" | "session_start" | "input";
+  type: "start" | "stop" | "session_start" | "error";
   timestamp: number;
   payload: unknown;
 }
@@ -79,8 +92,9 @@ export interface IpcMessage {
 
 export type IpcPayload =
   | { type: "session_start" }
-  | { type: "turn_end"; event: TurnEndEvent }
-  | { type: "input"; event: InputEvent }
+  | { type: "start"; turnIndex: number; userPrompt?: string }
+  | { type: "stop"; turnIndex: number; event: TurnEndEvent; userPrompt?: string }
+  | { type: "error"; detail: string }
   | { type: "feedback"; content: string }
   | { type: "analysis_error"; error: string };
 
@@ -113,6 +127,23 @@ export function isFeedbackPayload(value: unknown): value is FeedbackPayload {
   const type = Reflect.get(value, "type");
   const content = Reflect.get(value, "content");
   return type === "feedback" && typeof content === "string";
+}
+
+export function isStartPayload(value: unknown): value is Extract<IpcPayload, { type: "start" }> {
+  if (typeof value !== "object" || value === null) return false;
+  const type = Reflect.get(value, "type");
+  const turnIndex = Reflect.get(value, "turnIndex");
+  return type === "start" && typeof turnIndex === "number";
+}
+
+export function isStopPayload(value: unknown): value is Extract<IpcPayload, { type: "stop" }> {
+  if (typeof value !== "object" || value === null) return false;
+  const type = Reflect.get(value, "type");
+  const turnIndex = Reflect.get(value, "turnIndex");
+  const event = Reflect.get(value, "event");
+  return (
+    type === "stop" && typeof turnIndex === "number" && typeof event === "object" && event !== null
+  );
 }
 
 export function isAssistantMessage(
