@@ -25,31 +25,10 @@ describe("feedback-loop", () => {
     expect(state.pendingVerification).toBe(true);
   });
 
-  it("turnEndHandler skips turns caused by our own feedback injection", () => {
-    const state = makeMockState({
-      mode: "active",
-      skipTurnEndCount: 2,
-    });
-    const pi = makeMockPi();
-    const escalation = makeMockEscalation();
-    const loop = createFeedbackLoop({ state, pi, escalation });
-
-    // First turn_end: skipped, counter decremented to 1
-    loop.turnEndHandler(fromAny<TurnEndEvent, unknown>({}));
-    expect(state.pendingVerification).toBe(false);
-    expect(state.skipTurnEndCount).toBe(1);
-
-    // Second turn_end: skipped, counter decremented to 0
-    loop.turnEndHandler(fromAny<TurnEndEvent, unknown>({}));
-    expect(state.pendingVerification).toBe(false);
-    expect(state.skipTurnEndCount).toBe(0);
-  });
-
   it("turnEndHandler sets pendingVerification when conditions are met", () => {
     const state = makeMockState({
       mode: "active",
       pendingVerification: false,
-      skipTurnEndCount: 0,
     });
     const pi = makeMockPi();
     const escalation = makeMockEscalation();
@@ -68,7 +47,7 @@ describe("feedback-loop", () => {
     loop.onFeedback({ type: "feedback", content: "There is a bug here." });
 
     expect(state.pendingVerification).toBe(false);
-    expect(state.skipTurnEndCount).toBe(1);
+    expect(state.injectedNext).toBe(true);
     expect(pi.sendUserMessage).toHaveBeenCalledTimes(1);
     expect(pi.sendUserMessage).toHaveBeenCalledWith(
       "🔍 **Verifier feedback:**\nThere is a bug here.",
@@ -86,6 +65,7 @@ describe("feedback-loop", () => {
 
     expect(state.pendingVerification).toBe(false);
     expect(pi.sendUserMessage).not.toHaveBeenCalled();
+    expect(state.injectedNext).toBe(false);
   });
 
   it("onFeedback ignores whitespace-only content", () => {
@@ -98,6 +78,7 @@ describe("feedback-loop", () => {
 
     expect(state.pendingVerification).toBe(false);
     expect(pi.sendUserMessage).not.toHaveBeenCalled();
+    expect(state.injectedNext).toBe(false);
   });
 
   it("onFeedback ignores LGTM", () => {
@@ -110,6 +91,7 @@ describe("feedback-loop", () => {
 
     expect(state.pendingVerification).toBe(false);
     expect(pi.sendUserMessage).not.toHaveBeenCalled();
+    expect(state.injectedNext).toBe(false);
   });
 
   it("onFeedback resets pendingVerification even for ignored content", () => {
@@ -126,16 +108,16 @@ describe("feedback-loop", () => {
     expect(state.pendingVerification).toBe(false);
   });
 
-  it("onFeedback increments skipTurnEndCount only for actionable content", () => {
+  it("onFeedback sets injectedNext only for actionable content", () => {
     const state = makeMockState();
     const pi = makeMockPi();
     const escalation = makeMockEscalation();
     const loop = createFeedbackLoop({ state, pi, escalation });
 
     loop.onFeedback({ type: "feedback", content: "LGTM" });
-    expect(state.skipTurnEndCount).toBe(0);
+    expect(state.injectedNext).toBe(false);
 
     loop.onFeedback({ type: "feedback", content: "Fix this." });
-    expect(state.skipTurnEndCount).toBe(1);
+    expect(state.injectedNext).toBe(true);
   });
 });

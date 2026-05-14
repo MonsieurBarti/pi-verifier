@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionContext, InputEvent, VerifierState } from "./types.js";
+import type { ExtensionAPI, ExtensionContext, VerifierState } from "./types.js";
 
 export interface EscalationDeps {
   state: VerifierState;
@@ -6,7 +6,6 @@ export interface EscalationDeps {
 }
 
 export interface EscalationController {
-  inputHandler: (event: InputEvent, ctx: ExtensionContext) => void;
   checkEscalation: (ctx: ExtensionContext) => boolean;
   incrementAttempts: (ctx: ExtensionContext) => void;
   resume: () => void;
@@ -14,11 +13,6 @@ export interface EscalationController {
 
 export function createEscalationController(deps: EscalationDeps): EscalationController {
   const { state } = deps;
-
-  const inputHandler = (_event: InputEvent, _ctx: ExtensionContext): void => {
-    // Reset counter on any real user input — this starts a fresh verification window
-    state.verificationAttempts = 0;
-  };
 
   const checkEscalation = (ctx: ExtensionContext): boolean => {
     if (state.escalationPaused) {
@@ -47,5 +41,5 @@ export function createEscalationController(deps: EscalationDeps): EscalationCont
     state.verificationAttempts = 0;
   };
 
-  return { inputHandler, checkEscalation, incrementAttempts, resume };
+  return { checkEscalation, incrementAttempts, resume };
 }
